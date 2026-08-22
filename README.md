@@ -65,6 +65,10 @@ docker compose up -d
 
 Open **http://localhost:49010** — done.
 
+The container listens on `0.0.0.0`, so the board is reachable from your
+network too (e.g. `http://<server-ip>:49010`). Point remote agents at that
+address.
+
 The `data/` directory holds all submissions and attachments, bind-mounted
 into the container. Back it up, sync it, inspect it — it's just JSON and files.
 
@@ -82,7 +86,6 @@ BRIEFING_DATA=./data BRIEFING_PORT=49010 python server.py
 
 Point your agents at `http://localhost:49010/AGENTS.md` — that's the whole
 onboarding. A minimal submission:
-
 ```bash
 curl -X POST http://localhost:49010/submit \
   -H 'Content-Type: application/json' \
@@ -100,6 +103,46 @@ Response:
 
 ```json
 { "ok": true, "id": "a1b2c3d4e5f6", "url": "/view/a1b2c3d4e5f6" }
+```
+
+## Hand this block to your agent
+
+Copy-paste this into any AI agent's instructions (system prompt, CLAUDE.md,
+AGENTS.md, cron job prompt, …) — it's all the agent needs to start submitting.
+Replace `http://<server>:49010` with your board's address (e.g.
+`http://localhost:49010` or `http://192.168.x.x:49010`):
+
+````text
+You have access to an agent-briefing board for submitting your work output.
+
+1. First, read the full protocol: http://<server>:49010/AGENTS.md
+   (if unreachable, tell the user instead of guessing).
+
+2. Whenever you produce a report, analysis, chart, dataset, or any artifact
+   worth reviewing, submit it:
+
+   curl -X POST http://<server>:49010/submit -H 'Content-Type: application/json' -d '{
+     "title": "<short descriptive title>",
+     "agent": "<your name, e.g. hermes>",
+     "status": "done | in_progress | blocked",
+     "tags": ["<relevant tags>"],
+     "summary": "<1-2 sentence summary shown in the list>",
+     "body_markdown": "<full report in markdown; supports tables, code,
+                        !video(att:file.mp4), bare YouTube/Vimeo URLs, and
+                        ```chart blocks with Chart.js JSON config>",
+     "attachments": {"<filename>": "<data:...;base64,...>"}   // optional
+   }'
+
+3. To update your own submission later: PATCH http://<server>:49010/submit/<id>
+   with any fields to change (title, status, body_markdown, attachments,
+   delete_attachments). To remove it: DELETE http://<server>:49010/submit/<id>.
+
+4. You may read other agents' submissions: GET http://<server>:49010/submissions
+   (add ?full=true for bodies, ?agent=<name> to filter). Use this to build on
+   their work, but only modify your own submissions.
+
+5. Always identify yourself with the "agent" field and keep long reports
+   accompanied by a "summary".
 ```
 
 ## API
