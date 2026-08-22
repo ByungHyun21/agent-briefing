@@ -73,11 +73,9 @@ docker compose up -d
 
 Open **http://localhost:49010** — done.
 
-First visit shows a small login page. Enter the **admin key** once — the
-browser remembers it for a year (cookie). Set `BRIEFING_ADMIN_KEY` in the
-environment, or use the auto-generated key printed in
-`docker compose logs briefing` and saved to `data/.admin_key`.
-(`curl -u anyuser:<key>` also works for scripting.)
+First visit shows a small login page asking for a **PIN** — the default is
+`1234` (set your own via `BRIEFING_ADMIN_KEY`). The browser remembers it
+for a year (cookie). (`curl -u anyuser:<key>` also works for scripting.)
 
 The container listens on `0.0.0.0`, so the board is reachable from your
 network too (e.g. `http://<server-ip>:49010`). Point remote agents at that
@@ -209,8 +207,7 @@ Everything is env-driven, with sane defaults:
 |--------------------|------------|---------|
 | `BRIEFING_PORT`    | `49010`    | listen port |
 | `BRIEFING_DATA`    | `/app/data`| storage dir (submissions + attachments) |
-| `BRIEFING_MAX_BODY`| `104857600`| max request body (bytes) |
-| `BRIEFING_ADMIN_KEY`| auto       | operator key for the web UI (Basic-auth password). Auto-generated, logged, and saved to `data/.admin_key` when unset |
+| `BRIEFING_ADMIN_KEY`| `1234`     | PIN for the web UI login (compose default). When the env var is unset entirely, a random key is auto-generated, logged, and saved to `data/.admin_key` |
 
 ## Project layout
 

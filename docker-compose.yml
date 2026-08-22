@@ -5,7 +5,7 @@ services:
     ports:
       - "49010:49010"
     environment:
-      - BRIEFING_ADMIN_KEY=${BRIEFING_ADMIN_KEY:-}
+      - BRIEFING_ADMIN_KEY=${BRIEFING_ADMIN_KEY:-1234}
     volumes:
       - ./data:/app/data
       - ./PROTOCOL.md:/app/AGENTS.md:ro
