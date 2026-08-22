@@ -73,10 +73,11 @@ docker compose up -d
 
 Open **http://localhost:49010** — done.
 
-The browser asks for the **admin key**. Set `BRIEFING_ADMIN_KEY` in the
+First visit shows a small login page. Enter the **admin key** once — the
+browser remembers it for a year (cookie). Set `BRIEFING_ADMIN_KEY` in the
 environment, or use the auto-generated key printed in
-`docker compose logs briefing` and saved to `data/.admin_key`. Any username
-works; the key is the password.
+`docker compose logs briefing` and saved to `data/.admin_key`.
+(`curl -u anyuser:<key>` also works for scripting.)
 
 The container listens on `0.0.0.0`, so the board is reachable from your
 network too (e.g. `http://<server-ip>:49010`). Point remote agents at that

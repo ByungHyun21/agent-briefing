@@ -7,6 +7,7 @@
 - Humans browse at /.  Protocol for agents: AGENTS.md (also at /AGENTS.md).
 """
 import base64
+import hashlib
 import html
 import json
 import os
@@ -47,6 +48,10 @@ def admin_key():
             print(f"admin UI key (auto-generated, data/.admin_key): {_ADMIN_KEY}",
                   flush=True)
     return _ADMIN_KEY
+
+
+def admin_cookie_value():
+    return hashlib.sha256(admin_key().encode("utf-8")).hexdigest()
 
 INLINE_TYPES = {
     "png": "image/png", "jpg": "image/jpeg", "jpeg": "image/jpeg",
@@ -556,6 +561,46 @@ def render_view(sub_id):
     return body, 200, scripts
 
 
+def login_page(error=False):
+    msg = ('<p class="err">wrong key</p>' if error else
+           '<p class="hint">operator access &mdash; enter the admin key</p>')
+    return f"""<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>login &middot; agent-briefing</title>
+<style>
+  :root {{ --fg:#171717; --dim:#666; --line:#eaeaea; --panel:#fafafa;
+          --accent:#0070f3; --red:#dc2626; }}
+  * {{ box-sizing:border-box; }}
+  body {{ margin:0; min-height:100vh; display:flex; align-items:center;
+         justify-content:center; background:#fff; color:var(--fg);
+         font:14px/1.6 'Inter',-apple-system,"Segoe UI",Roboto,"Noto Sans KR",sans-serif; }}
+  .card {{ width:320px; padding:28px; border:1px solid var(--line);
+          border-radius:10px; background:var(--panel); }}
+  h1 {{ font-size:15px; margin:0 0 4px; font-weight:600; }}
+  .hint {{ color:var(--dim); margin:0 0 16px; font-size:12.5px; }}
+  .err {{ color:var(--red); margin:0 0 16px; font-size:12.5px; }}
+  input {{ width:100%; font:inherit; padding:8px 10px; margin-bottom:10px;
+          border:1px solid var(--line); border-radius:6px; }}
+  input:focus {{ outline:2px solid var(--accent); outline-offset:-1px; }}
+  button {{ width:100%; font:inherit; font-weight:500; padding:8px 10px;
+           border:0; border-radius:6px; background:var(--accent); color:#fff;
+           cursor:pointer; }}
+</style>
+</head>
+<body>
+<form class="card" method="post" action="/login">
+  <h1>agent-briefing</h1>
+  {msg}
+  <input type="password" name="key" autofocus autocomplete="current-password">
+  <button type="submit">Continue</button>
+</form>
+</body>
+</html>"""
+
+
 # ---------------------------------------------------------------- handler
 class Handler(BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
@@ -594,19 +639,28 @@ class Handler(BaseHTTPRequestHandler):
 
     def is_admin(self):
         h = self.headers.get("Authorization", "")
-        if not h.startswith("Basic "):
-            return False
-        try:
-            pw = base64.b64decode(h[6:].strip()).decode("utf-8").partition(":")[2]
-        except (ValueError, UnicodeDecodeError):
-            return False
-        return secrets.compare_digest(pw, admin_key())
+        if h.startswith("Basic "):
+            try:
+                pw = base64.b64decode(h[6:].strip()).decode("utf-8").partition(":")[2]
+            except (ValueError, UnicodeDecodeError):
+                pw = ""
+            if pw and secrets.compare_digest(pw, admin_key()):
+                return True
+        for part in self.headers.get("Cookie", "").split(";"):
+            name, _, val = part.strip().partition("=")
+            if name == "briefing_admin":
+                return secrets.compare_digest(val, admin_cookie_value())
+        return False
 
     def require_admin(self):
         """Reject with 401 unless the request carries the operator key
-        (Basic auth, any username). Returns True when rejected."""
+        (login cookie or Basic auth). Browsers get the login form; plain
+        API clients get a Basic-auth challenge. Returns True when rejected."""
         if self.is_admin():
             return False
+        if "text/html" in self.headers.get("Accept", ""):
+            self._send(401, login_page())
+            return True
         body = b"admin key required\n"
         self.send_response(401)
         self.send_header("WWW-Authenticate",
@@ -618,6 +672,26 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(body)
         return True
 
+    def _redirect(self, loc, set_cookie=None):
+        self.send_response(303)
+        if set_cookie:
+            self.send_header("Set-Cookie", set_cookie)
+        self.send_header("Location", loc)
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+
+    def handle_login(self):
+        n = int(self.headers.get("Content-Length") or 0)
+        if n > 65536:
+            return self._send(413, "payload too large", "text/plain")
+        form = parse_qs(self.rfile.read(n).decode("utf-8", "replace"))
+        key = (form.get("key") or [""])[0].strip()
+        if key and secrets.compare_digest(key, admin_key()):
+            cookie = (f"briefing_admin={admin_cookie_value()}; Path=/; "
+                      "Max-Age=31536000; HttpOnly; SameSite=Lax")
+            return self._redirect("/", set_cookie=cookie)
+        return self._send(401, login_page(error=True))
+
     # ---- GET
     def do_GET(self):
         u = urlparse(self.path)
@@ -626,6 +700,10 @@ class Handler(BaseHTTPRequestHandler):
                 or u.path.startswith("/attachments/")):
             if self.require_admin():
                 return
+        if u.path == "/login":
+            if self.is_admin():
+                return self._redirect("/")
+            return self._send(200, login_page())
         if u.path in ("/", "/index.html"):
             q = parse_qs(u.query)
             return self._send(200, render_index(
@@ -689,6 +767,8 @@ class Handler(BaseHTTPRequestHandler):
     # ---- POST /submit
     def do_POST(self):
         u = urlparse(self.path)
+        if u.path == "/login":
+            return self.handle_login()
         m = re.fullmatch(r"/submit/([a-zA-Z0-9_-]+)", u.path)
         if m:
             return self.handle_update(m.group(1), create=True)
