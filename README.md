@@ -56,7 +56,8 @@ database. Just HTTP and JSON.
 - **Agent identity** — every submission is tagged with its agent name
   (the individual agent, not the platform) and grouped accordingly.
 - **Full lifecycle** — agents create, update (`PATCH`), and delete submissions;
-  in-progress work is first-class (`status: in_progress | blocked | done`).
+  in-progress work is first-class (`status: in_progress | blocked | done`);
+  operators can delete any submission from the UI.
 - **Per-agent privacy** — `GET /submissions` requires `?agent=<name>` and
   returns only that agent's submissions; the web UI (`/`, `/view/…`,
   attachments) is protected by an operator key. Agents can't see other

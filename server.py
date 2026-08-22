@@ -341,6 +341,10 @@ def layout(title, body, scripts="", nav=""):
            gap:4px 10px; align-items:center; }}
   .dot {{ display:inline-block; width:6px; height:6px; border-radius:50%;
           margin-right:5px; }}
+  .del {{ margin-left:auto; font:inherit; font-size:11.5px; padding:3px 9px;
+         border:1px solid var(--line); border-radius:6px; background:#fff;
+         color:var(--dim); cursor:pointer; }}
+  .del:hover {{ color:var(--red); border-color:var(--red); }}
   .dot.done {{ background:var(--green); }}
   .dot.in_progress {{ background:var(--amber); }}
   .dot.blocked {{ background:var(--red); }}
@@ -552,12 +556,25 @@ def render_view(sub_id):
       <span>{html.escape(it.get('agent', 'unknown'))}</span>
       <span>{time.strftime('%Y-%m-%d %H:%M', time.localtime(it.get('ts', 0)))}</span>
       {updated}
+      <button class="del" id="del-btn" data-id="{it['id']}">Delete</button>
     </div>
     <div class="content">{content}
     {att_html}</div>
   </div>
   </div>"""
-    scripts = CHART_SCRIPT if charts else ""
+    del_script = f"""<script>
+(function() {{
+  var b = document.getElementById('del-btn');
+  if (!b) return;
+  b.addEventListener('click', function() {{
+    if (!confirm('Delete this submission?')) return;
+    fetch('/submit/{sub_id}', {{method: 'DELETE'}}).then(function(r) {{
+      if (r.ok) location.href = '/'; else alert('delete failed');
+    }}).catch(function() {{ alert('delete failed'); }});
+  }});
+}})();
+</script>"""
+    scripts = (CHART_SCRIPT if charts else "") + del_script
     return body, 200, scripts
 
 
