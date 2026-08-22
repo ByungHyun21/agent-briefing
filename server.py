@@ -11,6 +11,7 @@ import html
 import json
 import os
 import re
+import secrets
 import time
 import uuid
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -22,6 +23,30 @@ DATA_DIR = os.environ.get("BRIEFING_DATA", "/app/data")
 PORT = int(os.environ.get("BRIEFING_PORT", "49010"))
 MAX_BODY = int(os.environ.get("BRIEFING_MAX_BODY", str(100 * 1024 * 1024)))  # 100 MB
 VERSION = "1.1"
+
+_ADMIN_KEY = None
+
+
+def admin_key():
+    """Operator key for the human web UI: BRIEFING_ADMIN_KEY if set, else a
+    random key generated once and persisted as data/.admin_key."""
+    global _ADMIN_KEY
+    if _ADMIN_KEY is None:
+        _ADMIN_KEY = (os.environ.get("BRIEFING_ADMIN_KEY") or "").strip()
+        keyfile = os.path.join(DATA_DIR, ".admin_key")
+        if not _ADMIN_KEY:
+            try:
+                with open(keyfile, encoding="utf-8") as f:
+                    _ADMIN_KEY = f.read().strip()
+            except FileNotFoundError:
+                _ADMIN_KEY = ""
+        if not _ADMIN_KEY:
+            _ADMIN_KEY = secrets.token_urlsafe(12)
+            with open(keyfile, "w", encoding="utf-8") as f:
+                f.write(_ADMIN_KEY + "\n")
+            print(f"admin UI key (auto-generated, data/.admin_key): {_ADMIN_KEY}",
+                  flush=True)
+    return _ADMIN_KEY
 
 INLINE_TYPES = {
     "png": "image/png", "jpg": "image/jpeg", "jpeg": "image/jpeg",
@@ -567,9 +592,40 @@ class Handler(BaseHTTPRequestHandler):
             return None, {"error": "body must be a JSON object"}
         return payload, None
 
+    def is_admin(self):
+        h = self.headers.get("Authorization", "")
+        if not h.startswith("Basic "):
+            return False
+        try:
+            pw = base64.b64decode(h[6:].strip()).decode("utf-8").partition(":")[2]
+        except (ValueError, UnicodeDecodeError):
+            return False
+        return secrets.compare_digest(pw, admin_key())
+
+    def require_admin(self):
+        """Reject with 401 unless the request carries the operator key
+        (Basic auth, any username). Returns True when rejected."""
+        if self.is_admin():
+            return False
+        body = b"admin key required\n"
+        self.send_response(401)
+        self.send_header("WWW-Authenticate",
+                         'Basic realm="agent-briefing", charset="UTF-8"')
+        self.send_header("Content-Type", "text/plain; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        self.wfile.write(body)
+        return True
+
     # ---- GET
     def do_GET(self):
         u = urlparse(self.path)
+        if (u.path in ("/", "/index.html")
+                or u.path.startswith("/view/")
+                or u.path.startswith("/attachments/")):
+            if self.require_admin():
+                return
         if u.path in ("/", "/index.html"):
             q = parse_qs(u.query)
             return self._send(200, render_index(
@@ -792,5 +848,6 @@ class Handler(BaseHTTPRequestHandler):
 # ---------------------------------------------------------------- main
 if __name__ == "__main__":
     os.makedirs(DATA_DIR, exist_ok=True)
+    admin_key()
     print(f"agent-briefing v{VERSION} listening on :{PORT} (data: {DATA_DIR})", flush=True)
     ThreadingHTTPServer(("0.0.0.0", PORT), Handler).serve_forever()

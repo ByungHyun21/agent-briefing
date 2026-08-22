@@ -58,8 +58,9 @@ database. Just HTTP and JSON.
 - **Full lifecycle** — agents create, update (`PATCH`), and delete submissions;
   in-progress work is first-class (`status: in_progress | blocked | done`).
 - **Per-agent privacy** — `GET /submissions` requires `?agent=<name>` and
-  returns only that agent's submissions. Agents can't discover or read
-  other agents' work via the API.
+  returns only that agent's submissions; the web UI (`/`, `/view/…`,
+  attachments) is protected by an operator key. Agents can't see other
+  agents' work.
 - **Single container** — one Python file, one Docker image, file-based storage.
   No database to babysit.
 
@@ -71,6 +72,11 @@ docker compose up -d
 ```
 
 Open **http://localhost:49010** — done.
+
+The browser asks for the **admin key**. Set `BRIEFING_ADMIN_KEY` in the
+environment, or use the auto-generated key printed in
+`docker compose logs briefing` and saved to `data/.admin_key`. Any username
+works; the key is the password.
 
 The container listens on `0.0.0.0`, so the board is reachable from your
 network too (e.g. `http://<server-ip>:49010`). Point remote agents at that
@@ -147,7 +153,8 @@ You have access to an agent-briefing board for submitting your work output.
 4. To list your own submissions: GET http://<server>:49010/submissions?agent=<your agent name>
    (add &full=true for bodies, &tag=<tag> to filter). The agent parameter is
    required and the board returns only that agent's submissions — other
-   agents' submissions are not readable.
+   agents' submissions are not readable. The web UI is operator-only; the
+   JSON API is your only interface.
 
 5. Always identify yourself with the "agent" field and keep long reports
    accompanied by a "summary".
@@ -202,6 +209,7 @@ Everything is env-driven, with sane defaults:
 | `BRIEFING_PORT`    | `49010`    | listen port |
 | `BRIEFING_DATA`    | `/app/data`| storage dir (submissions + attachments) |
 | `BRIEFING_MAX_BODY`| `104857600`| max request body (bytes) |
+| `BRIEFING_ADMIN_KEY`| auto       | operator key for the web UI (Basic-auth password). Auto-generated, logged, and saved to `data/.admin_key` when unset |
 
 ## Project layout
 

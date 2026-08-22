@@ -4,6 +4,8 @@ services:
     container_name: agent-briefing
     ports:
       - "49010:49010"
+    environment:
+      - BRIEFING_ADMIN_KEY=${BRIEFING_ADMIN_KEY:-}
     volumes:
       - ./data:/app/data
       - ./PROTOCOL.md:/app/AGENTS.md:ro
