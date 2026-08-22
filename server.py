@@ -145,53 +145,77 @@ def layout(title, body, scripts=""):
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{html.escape(title)} · agent-briefing</title>
 <style>
-  :root {{ --bg:#0f1115; --panel:#171a21; --line:#262b36; --fg:#e6e9ef;
-          --dim:#8b93a7; --accent:#5eead4; }}
+  :root {{ --bg:#08090a; --panel:rgba(255,255,255,.024); --panel-hover:rgba(255,255,255,.045);
+          --line:rgba(255,255,255,.07); --fg:#f7f8f8; --dim:#8a8f98; --dimmer:#62666d;
+          --accent:#7170ff; --accent-hover:#828fff; --mono:#101113; }}
   * {{ box-sizing:border-box; }}
+  html {{ font-feature-settings:"cv01","ss03"; }}
   body {{ margin:0; background:var(--bg); color:var(--fg);
-         font:15px/1.6 -apple-system,"Segoe UI",Roboto,"Noto Sans KR",sans-serif; }}
-  a {{ color:var(--accent); text-decoration:none; }}
-  a:hover {{ text-decoration:underline; }}
-  header {{ border-bottom:1px solid var(--line); padding:18px 28px;
-            display:flex; align-items:baseline; gap:14px;
-            max-width:1080px; margin:0 auto; }}
-  header h1 {{ font-size:18px; margin:0; letter-spacing:.3px; }}
-  header .sub {{ color:var(--dim); font-size:13px; }}
-  main {{ max-width:1080px; margin:0 auto; padding:26px 28px 80px; }}
+         font:13.5px/1.55 'Inter',-apple-system,"Segoe UI",Roboto,"Noto Sans KR",sans-serif;
+         -webkit-font-smoothing:antialiased; }}
+  a {{ color:var(--fg); text-decoration:none; }}
+  a:hover {{ color:var(--accent-hover); }}
+  header {{ border-bottom:1px solid var(--line); padding:0 24px; height:48px;
+            display:flex; align-items:center; position:sticky; top:0;
+            background:rgba(8,9,10,.85); backdrop-filter:blur(8px); z-index:10;
+            max-width:860px; margin:0 auto; }}
+  header h1 {{ font-size:13px; margin:0; font-weight:590; letter-spacing:-.01em; }}
+  header h1 a {{ color:var(--fg); }}
+  header h1 a:hover {{ color:var(--accent-hover); }}
+  main {{ max-width:860px; margin:0 auto; padding:20px 24px 60px; }}
   .card {{ background:var(--panel); border:1px solid var(--line);
-           border-radius:10px; padding:20px 24px; margin-bottom:14px; }}
-  .card h2 {{ margin:0 0 6px; font-size:17px; }}
-  .meta {{ color:var(--dim); font-size:12.5px; margin-bottom:10px;
-           display:flex; flex-wrap:wrap; gap:10px; }}
-  .badge {{ padding:1px 9px; border-radius:99px; font-size:11.5px;
-            font-weight:600; border:1px solid var(--line); }}
-  .badge.done {{ color:#22c55e; border-color:#22c55e55; }}
-  .badge.in_progress {{ color:#f59e0b; border-color:#f59e0b55; }}
-  .badge.blocked {{ color:#ef4444; border-color:#ef444455; }}
-  .preview {{ color:var(--dim); font-size:13.5px; }}
-  .content {{ line-height:1.75; word-wrap:break-word; }}
-  .content h1,.content h2,.content h3 {{ border-bottom:1px solid var(--line);
-      padding-bottom:6px; margin-top:28px; }}
-  .content pre {{ background:#0b0d11; border:1px solid var(--line);
-      border-radius:8px; padding:14px; overflow-x:auto; }}
-  .content code {{ background:#0b0d11; border-radius:4px; padding:1px 5px;
-      font-size:13px; }}
-  .content pre code {{ padding:0; background:none; }}
-  .content table {{ border-collapse:collapse; width:100%; }}
-  .content th,.content td {{ border:1px solid var(--line); padding:7px 11px;
-      text-align:left; }}
-  .content th {{ background:#0b0d11; }}
-  .content blockquote {{ border-left:3px solid var(--accent); margin:12px 0;
-      padding:4px 16px; color:var(--dim); }}
-  .content img {{ max-width:100%; border-radius:8px; }}
-  .empty {{ color:var(--dim); text-align:center; padding:70px 0; }}
-  .empty code {{ background:var(--panel); border:1px solid var(--line); }}
-  .ghead {{ font-size:14px; color:var(--accent); margin:30px 0 10px;
-            letter-spacing:.3px; }}
+           border-radius:8px; padding:12px 16px; margin-bottom:8px;
+           transition:background .12s ease; }}
+  a.card:hover {{ background:var(--panel-hover); border-color:rgba(255,255,255,.11); }}
+  .card h2 {{ margin:0 0 4px; font-size:13.5px; font-weight:510; letter-spacing:-.01em; }}
+  .card .preview {{ margin-top:2px; }}
+  .meta {{ color:var(--dim); font-size:11.5px; display:flex; flex-wrap:wrap;
+           gap:6px 10px; align-items:center; }}
+  .badge {{ padding:0 7px; border-radius:99px; font-size:10.5px; line-height:17px;
+            font-weight:510; border:1px solid var(--line); color:var(--dim);
+            white-space:nowrap; }}
+  a.badge:hover {{ border-color:rgba(255,255,255,.18); color:var(--fg); }}
+  .badge.sel {{ color:var(--fg); border-color:rgba(255,255,255,.2);
+                background:rgba(255,255,255,.06); }}
+  .dot {{ display:inline-block; width:6px; height:6px; border-radius:50%;
+          margin-right:5px; vertical-align:0; }}
+  .dot.done {{ background:#10b981; }}
+  .dot.in_progress {{ background:#f59e0b; }}
+  .dot.blocked {{ background:#ef4444; }}
+  .st.done {{ color:#10b981; }}
+  .st.in_progress {{ color:#f59e0b; }}
+  .st.blocked {{ color:#ef4444; }}
+  .preview {{ color:var(--dim); font-size:12px; overflow:hidden;
+              text-overflow:ellipsis; white-space:nowrap; }}
+  .toolbar {{ display:flex; flex-wrap:wrap; gap:6px; align-items:center;
+              margin-bottom:16px; }}
+  .toolbar .sep {{ width:1px; height:14px; background:var(--line); margin:0 4px; }}
+  .ghead {{ font-size:11px; color:var(--dimmer); font-weight:590; margin:18px 0 6px;
+            letter-spacing:.05em; text-transform:uppercase; }}
   .ghead:first-child {{ margin-top:0; }}
-  .gcount {{ color:var(--dim); font-weight:400; font-size:12px; }}
-  footer {{ max-width:1080px; margin:0 auto; padding:0 28px 40px;
-            color:var(--dim); font-size:12.5px; }}
+  .gcount {{ color:var(--dimmer); font-weight:400; letter-spacing:0;
+             text-transform:none; }}
+  .content {{ line-height:1.7; font-size:13.5px; }}
+  .content h1 {{ font-size:19px; letter-spacing:-.02em; margin:24px 0 8px; }}
+  .content h2 {{ font-size:15.5px; letter-spacing:-.01em; margin:20px 0 6px; }}
+  .content h3 {{ font-size:14px; margin:16px 0 4px; }}
+  .content pre {{ background:#0b0c0e; border:1px solid var(--line);
+      border-radius:6px; padding:12px; overflow-x:auto; font-size:12px; }}
+  .content code {{ background:#0b0c0e; border-radius:4px; padding:1px 5px;
+      font-size:12px; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; }}
+  .content pre code {{ padding:0; background:none; }}
+  .content table {{ border-collapse:collapse; width:100%; font-size:12.5px; }}
+  .content th,.content td {{ border:1px solid var(--line); padding:5px 9px;
+      text-align:left; }}
+  .content th {{ background:rgba(255,255,255,.03); font-weight:510; }}
+  .content blockquote {{ border-left:2px solid var(--line); margin:10px 0;
+      padding:2px 14px; color:var(--dim); }}
+  .content img {{ max-width:100%; border-radius:6px; border:1px solid var(--line); }}
+  .content hr {{ border:0; border-top:1px solid var(--line); margin:20px 0; }}
+  .empty {{ color:var(--dim); text-align:center; padding:60px 0; font-size:13px; }}
+  .empty code {{ background:var(--panel); border:1px solid var(--line);
+                 border-radius:4px; padding:1px 5px; font-size:11.5px; }}
+  .video-wrap {{ margin:14px 0; }}
 </style>
 </head>
 <body>
@@ -233,30 +257,31 @@ def render_index(agent_filter=None, group="agent", sort="new"):
     # --- filter chips (by agent)
     chips = ""
     if all_agents:
-        chip_links = [f'<a class="badge" href="/?group={group}&sort={sort}">전체 ({len(items)})</a>']
+        chip_links = [f'<a class="badge{" sel" if not agent_filter else ""}" '
+                      f'href="/?group={group}&sort={sort}">all {len(items)}</a>']
         for a in all_agents:
             n = sum(1 for x in items if x.get("agent", "unknown") == a)
-            cls = "badge done" if agent_filter == a else "badge"
+            cls = "badge sel" if agent_filter == a else "badge"
             chip_links.append(
                 f'<a class="{cls}" '
                 f'href="/?agent={html.escape(a, quote=True)}&group={group}&sort={sort}">'
-                f'{html.escape(a)} ({n})</a>')
-        chips = f'<div class="meta" style="margin-bottom:12px">{"".join(chip_links)}</div>'
+                f'{html.escape(a)} {n}</a>')
+        chips = f'<div class="toolbar">{"".join(chip_links)}'
 
     # --- group/sort controls
     def ctl(cur, val, label, key, keep):
-        cls = "badge done" if cur == val else "badge"
+        cls = "badge sel" if cur == val else "badge"
         keep_q = "&".join(f"{k}={html.escape(v, quote=True)}" for k, v in keep if v)
         href = f"/?{keep_q}&{key}={val}" if keep_q else f"/?{key}={val}"
         return f'<a class="{cls}" href="{href}">{label}</a>'
 
-    controls = f'<div class="meta" style="margin-bottom:22px">그룹: ' + \
-        ctl(group, "agent", "에이전트별", "group", [("agent", agent_filter), ("sort", sort)]) + " " + \
-        ctl(group, "date", "일자별", "group", [("agent", agent_filter), ("sort", sort)]) + \
-        ' <span style="margin-left:14px;">정렬: ' + \
-        ctl(sort, "new", "최신순", "sort", [("agent", agent_filter), ("group", group)]) + " " + \
-        ctl(sort, "old", "오래된순", "sort", [("agent", agent_filter), ("group", group)]) + \
-        '</span></div>'
+    controls = ('<span class="sep"></span>' if chips else '<div class="toolbar">') + \
+        ctl(group, "agent", "by agent", "group", [("agent", agent_filter), ("sort", sort)]) + \
+        ctl(group, "date", "by date", "group", [("agent", agent_filter), ("sort", sort)]) + \
+        '<span class="sep"></span>' + \
+        ctl(sort, "new", "newest", "sort", [("agent", agent_filter), ("group", group)]) + \
+        ctl(sort, "old", "oldest", "sort", [("agent", agent_filter), ("group", group)])
+    controls = chips + controls + '</div>' if chips else controls + '</div>'
 
     if agent_filter:
         items = [x for x in items if x.get("agent", "unknown") == agent_filter]
@@ -279,23 +304,22 @@ def render_index(agent_filter=None, group="agent", sort="new"):
     # --- grouping
     def card(it):
         st = it.get("status", "done")
-        st_label = STATUS_STYLE.get(st, st)
-        tags = " ".join(f'<span class="badge">#{html.escape(t)}</span>'
-                        for t in it.get("tags", []))
+        tags = "".join(f'<a class="badge" href="/?tag={html.escape(t, quote=True)}&group={group}&sort={sort}">#{html.escape(t)}</a>'
+                       for t in it.get("tags", []))
         n_att = len(it.get("attachments", []))
-        att_info = f'<span>📎 {n_att}</span>' if n_att else ""
+        att_info = f'<span title="attachments">{n_att}📎</span>' if n_att else ""
         preview = html.escape((it.get("summary") or it.get("body_markdown", ""))[:200])
         return f"""
-  <a class="card" style="display:block;color:inherit;" href="/view/{it['id']}">
+  <a class="card" href="/view/{it['id']}">
     <h2>{html.escape(it.get('title', '(untitled)'))}</h2>
     <div class="meta">
-      <span class="badge {html.escape(str(st))}">{html.escape(st_label)}</span>
+      <span class="st {html.escape(str(st))}"><span class="dot {html.escape(str(st))}"></span>{html.escape(str(st))}</span>
       <span>{html.escape(it.get('agent', 'unknown'))}</span>
       <span>{time.strftime('%Y-%m-%d %H:%M', time.localtime(it.get('ts', 0)))}</span>
       {att_info}
       {tags}
     </div>
-    <div class="preview">{preview}…</div>
+    <div class="preview">{preview}</div>
   </a>"""
 
     sections = []
@@ -325,7 +349,6 @@ def render_view(sub_id):
     if not it:
         return ('<div class="empty">없는 제출물입니다. <a href="/">목록으로</a></div>', 404, "")
     st = it.get("status", "done")
-    st_label = STATUS_STYLE.get(st, st)
     content, charts = extract_charts(md_to_html(sub_id, it.get("body_markdown", "")))
     atts = it.get("attachments", [])
     att_html = ""
@@ -333,20 +356,19 @@ def render_view(sub_id):
         rows = "".join(
             f'<li><a href="/attachments/{it["id"]}/{html.escape(a)}" download>{html.escape(a)}</a></li>'
             for a in atts)
-        att_html = f"<h3>첨부 파일</h3><ul>{rows}</ul>"
+        att_html = f"<h3>Attachments</h3><ul>{rows}</ul>"
     updated = ""
     if it.get("updated_ts") and it["updated_ts"] != it.get("ts"):
-        updated = (f'<span>수정: {time.strftime("%Y-%m-%d %H:%M", time.localtime(it["updated_ts"]))}</span>')
+        updated = (f'<span>· edited {time.strftime("%Y-%m-%d %H:%M", time.localtime(it["updated_ts"]))}</span>')
     body = f"""
-  <p style="margin:0 0 14px;"><a href="/">&larr; 목록으로</a></p>
-  <div class="card">
-    <h2 style="font-size:22px;">{html.escape(it.get('title', '(untitled)'))}</h2>
-    <div class="meta">
-      <span class="badge {html.escape(str(st))}">{html.escape(st_label)}</span>
+  <p style="margin:0 0 12px;font-size:12px;"><a href="/">&larr; agent-briefing</a></p>
+  <div class="card" style="padding:20px 24px;">
+    <h2 style="font-size:18px;letter-spacing:-.02em;">{html.escape(it.get('title', '(untitled)'))}</h2>
+    <div class="meta" style="margin-bottom:14px;">
+      <span class="st {html.escape(str(st))}"><span class="dot {html.escape(str(st))}"></span>{html.escape(str(st))}</span>
       <span>{html.escape(it.get('agent', 'unknown'))}</span>
-      <span>{time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(it.get('ts', 0)))}</span>
+      <span>{time.strftime('%Y-%m-%d %H:%M', time.localtime(it.get('ts', 0)))}</span>
       {updated}
-      <span>id: {html.escape(it['id'])}</span>
     </div>
     <div class="content">{content}
     {att_html}</div>
