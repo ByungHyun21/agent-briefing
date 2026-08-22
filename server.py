@@ -78,6 +78,9 @@ YT_RE = re.compile(
 VIMEO_RE = re.compile(r"^(?:<p>)?\s*(?:https?://)?(?:www\.)?vimeo\.com/(\d+)\s*(?:</p>)?\s*$", re.M)
 
 
+IMG_EXTS = (".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".bmp")
+
+
 def md_to_html(sub_id, text):
     # attachment refs before markdown: ](att:name) -> absolute URL
     text = re.sub(r"\]\(att:([^)\s]+)\)", f"](/attachments/{sub_id}/\\1)", text)
@@ -91,6 +94,14 @@ def md_to_html(sub_id, text):
     text = re.sub(r"!video\(([^)\s]+)\)", vid, text)
 
     out = markdown.markdown(text, extensions=MD_EXTENSIONS)
+
+    # image attachments referenced as links: <a href="...x.png">…</a> → <img>
+    def swap(m):
+        url, label = m.group(1), m.group(2)
+        if url.lower().rsplit("?", 1)[0].endswith(IMG_EXTS):
+            return f'<img src="{url}" alt="{html.unescape(label)}" loading="lazy">'
+        return m.group(0)
+    out = re.sub(r'<a href="(/attachments/[^"]+)">([^<]*)</a>', swap, out)
 
     # YouTube / Vimeo auto-embed (paragraph = bare URL)
     out = YT_RE.sub(
@@ -166,7 +177,52 @@ def add_comment(sub_id, author, text):
 STATUS_STYLE = {"done": "done", "in_progress": "in progress", "blocked": "blocked"}
 
 
-def layout(title, body, scripts=""):
+def build_nav(current_id=None):
+    """Sidebar: collapsible agent groups, then by-date section."""
+    items = load_submissions()
+    items.sort(key=lambda x: x.get("ts", 0), reverse=True)
+    comments = load_comments()
+
+    def unread_dot(it):
+        n = len(comments.get(it["id"], []))
+        return '<span style="color:var(--accent);font-size:10px;">●</span>' if n else ""
+
+    def link(s):
+        sel = ' class="sel"' if s["id"] == current_id else ""
+        return (f'<a href="/view/{s["id"]}"{sel}>'
+                f'{html.escape(s.get("title", "(untitled)"))} {unread_dot(s)}</a>')
+
+    parts = ['<div class="navhead">Agents</div>']
+    by_agent = {}
+    for it in items:
+        by_agent.setdefault(it.get("agent", "unknown"), []).append(it)
+    for a in sorted(by_agent):
+        subs = by_agent[a]
+        links = "".join(link(s) for s in subs)
+        parts.append(
+            f'<div class="navgroup" data-key="agent-{html.escape(a, quote=True)}">'
+            f'<button data-key="agent-{html.escape(a, quote=True)}">'
+            f'<span class="caret">&#9654;</span>{html.escape(a)}'
+            f'<span class="cnt">{len(subs)}</span></button>'
+            f'<div class="items">{links}</div></div>')
+
+    parts.append('<div class="navhead">By date</div>')
+    by_day = {}
+    for it in items:
+        by_day.setdefault(time.strftime("%Y-%m-%d", time.localtime(it.get("ts", 0))), []).append(it)
+    for day in sorted(by_day, reverse=True):
+        subs = by_day[day]
+        links = "".join(link(s) for s in subs)
+        parts.append(
+            f'<div class="navgroup" data-key="day-{day}">'
+            f'<button data-key="day-{day}">'
+            f'<span class="caret">&#9654;</span>{day}'
+            f'<span class="cnt">{len(subs)}</span></button>'
+            f'<div class="items">{links}</div></div>')
+    return "".join(parts)
+
+
+def layout(title, body, scripts="", nav=""):
     return f"""<!doctype html>
 <html lang="en">
 <head>
@@ -188,11 +244,48 @@ def layout(title, body, scripts=""):
   header {{ border-bottom:1px solid var(--line); height:52px;
             display:flex; align-items:center; position:sticky; top:0;
             background:rgba(255,255,255,.9); backdrop-filter:blur(6px); z-index:10; }}
-  header .wrap {{ max-width:720px; margin:0 auto; padding:0 24px; width:100%; }}
+  header .wrap {{ padding:0 20px; width:100%; display:flex; align-items:center;
+                  gap:12px; }}
   header h1 {{ font-size:14px; margin:0; font-weight:600; letter-spacing:-.01em; }}
   header h1 a:hover {{ color:var(--accent); }}
+  #navbtn {{ font:inherit; font-size:13px; line-height:1; padding:6px 9px;
+             border:1px solid var(--line); border-radius:6px; background:#fff;
+             color:var(--dim); cursor:pointer; }}
+  #navbtn:hover {{ border-color:#ccc; color:var(--fg); }}
 
-  main {{ max-width:720px; margin:0 auto; padding:28px 24px 80px; }}
+  .shell {{ display:flex; min-height:calc(100vh - 52px); }}
+  aside {{ width:260px; flex:0 0 auto; border-right:1px solid var(--line);
+           padding:20px 14px 40px 20px; overflow-y:auto;
+           max-height:calc(100vh - 52px); position:sticky; top:52px; }}
+  aside.hidden {{ display:none; }}
+  .navhead {{ font-size:11px; color:var(--dimmer); font-weight:600;
+              letter-spacing:.06em; text-transform:uppercase; margin:18px 0 6px; }}
+  .navhead:first-child {{ margin-top:0; }}
+  .navgroup {{ margin-bottom:2px; }}
+  .navgroup > button {{ font:inherit; font-size:12.5px; font-weight:500; width:100%;
+      text-align:left; padding:5px 8px; border:0; border-radius:6px;
+      background:none; color:var(--fg); cursor:pointer;
+      display:flex; align-items:center; gap:6px; }}
+  .navgroup > button:hover {{ background:var(--panel); }}
+  .navgroup .caret {{ display:inline-block; transition:transform .12s ease;
+      font-size:9px; color:var(--dimmer); width:10px; }}
+  .navgroup.open .caret {{ transform:rotate(90deg); }}
+  .navgroup .cnt {{ color:var(--dimmer); font-weight:400; font-size:11px;
+                    margin-left:auto; }}
+  .navgroup .items {{ display:none; }}
+  .navgroup.open .items {{ display:block; }}
+  .navgroup .items a {{ display:block; font-size:12.5px; color:var(--dim);
+      padding:3px 8px 3px 24px; border-radius:6px;
+      white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }}
+  .navgroup .items a:hover {{ color:var(--fg); background:var(--panel); }}
+  .navlink {{ display:block; font-size:12.5px; color:var(--dim); padding:4px 8px;
+              border-radius:6px; white-space:nowrap; overflow:hidden;
+              text-overflow:ellipsis; }}
+  .navlink:hover {{ color:var(--fg); background:var(--panel); }}
+  .navlink.sel {{ background:var(--panel); color:var(--fg); font-weight:500; }}
+
+  main {{ flex:1 1 auto; min-width:0; max-width:760px; margin:0 auto;
+          padding:28px 24px 80px; }}
 
   .toolbar {{ display:flex; flex-wrap:wrap; gap:6px; align-items:center;
               margin-bottom:24px; }}
@@ -274,10 +367,41 @@ def layout(title, body, scripts=""):
 </style>
 </head>
 <body>
-<header><div class="wrap"><h1><a href="/">agent-briefing</a></h1></div></header>
+<header><div class="wrap">
+  <button id="navbtn" aria-label="toggle sidebar">&#9776;</button>
+  <h1><a href="/">agent-briefing</a></h1>
+</div></header>
+<div class="shell">
+<aside id="sidebar">
+{nav}
+</aside>
 <main>
 {body}
 </main>
+</div>
+<script>
+(function() {{
+  var btn = document.getElementById('navbtn'), sb = document.getElementById('sidebar');
+  var saved = null;
+  try {{ saved = localStorage.getItem('sb'); }} catch(e) {{}}
+  if (saved === 'hidden') sb.classList.add('hidden');
+  btn.addEventListener('click', function() {{
+    sb.classList.toggle('hidden');
+    try {{ localStorage.setItem('sb', sb.classList.contains('hidden') ? 'hidden' : 'open'); }} catch(e) {{}}
+  }});
+  document.querySelectorAll('.navgroup > button').forEach(function(b) {{
+    var g = b.parentElement, key = 'ng-' + b.dataset.key;
+    var savedOpen = null;
+    try {{ savedOpen = localStorage.getItem(key); }} catch(e) {{}}
+    if (savedOpen === 'open') g.classList.add('open');
+    else if (savedOpen === 'closed') g.classList.remove('open');
+    b.addEventListener('click', function() {{
+      g.classList.toggle('open');
+      try {{ localStorage.setItem(key, g.classList.contains('open') ? 'open' : 'closed'); }} catch(e) {{}}
+    }});
+  }});
+}})();
+</script>
 {scripts}
 </body>
 </html>"""
@@ -352,7 +476,7 @@ def render_index(agent_filter=None, group="agent", sort="new"):
   -H 'Content-Type: application/json' \\
   -d '{"title":"First report","body_markdown":"# Hello"}'</pre>
         </div>"""
-        return layout("index", body)
+        return layout("index", body, nav=build_nav())
 
     # --- grouping
     def card(it):
@@ -393,7 +517,7 @@ def render_index(agent_filter=None, group="agent", sort="new"):
             sections.append(f'<h2 class="ghead">{html.escape(a)} '
                             f'<span class="gcount">{len(by_agent[a])}</span></h2>')
             sections.extend(card(it) for it in by_agent[a])
-    return layout("index", chips + controls + "".join(sections))
+    return layout("index", chips + controls + "".join(sections), nav=build_nav())
 
 
 def render_view(sub_id):
@@ -499,7 +623,7 @@ class Handler(BaseHTTPRequestHandler):
         if m:
             body, code, scripts = render_view(m.group(1))
             title = m.group(1)
-            return self._send(code, layout(title, body, scripts))
+            return self._send(code, layout(title, body, scripts, nav=build_nav(m.group(1))))
         m = re.fullmatch(r"/attachments/([a-zA-Z0-9_-]+)/(.+)", u.path)
         if m:
             sub_id, rel = m.group(1), safe_rel_path(m.group(2))
@@ -632,7 +756,7 @@ class Handler(BaseHTTPRequestHandler):
         text = (fields.get("text") or [""])[0].strip()[:4000]
         if not author or not text:
             page, code, scripts = render_view(sub_id)
-            return self._send(code, layout(sub_id, page, scripts))
+            return self._send(code, layout(sub_id, page, scripts, nav=build_nav(sub_id)))
         add_comment(sub_id, author, text)
         self.send_response(303)
         self.send_header("Location", f"/view/{sub_id}")
