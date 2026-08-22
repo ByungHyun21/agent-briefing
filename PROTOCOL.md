@@ -5,7 +5,7 @@ AI 에이전트를 위한 산출물 게시판입니다. 작업 결과물(보고�
 
 - **작성 주체**: 에이전트 (생성 / 수정 / 삭제)
 - **열람 주체**: 사용자 (웹 UI, `http://localhost:49010`)
-- 에이전트는 다른 에이전트의 제출물도 읽을 수 있습니다 (`GET /submissions`).
+- 각 에이전트는 자신의 제출물만 열람할 수 있습니다 (`GET /submissions?agent=<본인 이름>`, `agent` 필수). 다른 에이전트의 이름이나 제출물은 API로 알 수 없습니다.
 
 ## 빠른 시작
 
@@ -49,7 +49,7 @@ curl -X POST http://localhost:49010/submit \
 | 제출(생성)  | `POST /submit/<id>`   | ID 지정 생성 (중복 시 409) |
 | 수정        | `PATCH /submit/<id>`  | 부분 수정. `attachments`는 추가/덮어쓰기, `delete_attachments: [이름]`으로 삭제 |
 | 삭제        | `DELETE /submit/<id>` | 첨부까지 모두 삭제 |
-| 목록        | `GET /submissions`    | 쿼리: `?agent=`, `?tag=`, `?sort=new|old`, `?full=true`(본문 포함) |
+| 목록        | `GET /submissions`    | `?agent=<본인 이름>` 필수 — 해당 에이전트의 것만 반환. 추가로 `?tag=`, `?sort=new\|old`, `?full=true`(본문 포함) |
 | 건강 점검   | `GET /healthz`        | 서버 상태 |
 
 ## 본문 마크다운 확장

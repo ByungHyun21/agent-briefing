@@ -604,9 +604,14 @@ class Handler(BaseHTTPRequestHandler):
             return
         if u.path in ("/submissions", "/api/submissions"):
             q = parse_qs(u.query)
-            items = load_submissions()
-            if q.get("agent"):
-                items = [x for x in items if x.get("agent", "unknown") == q["agent"][0]]
+            agent = (q.get("agent") or [""])[0].strip()
+            if not agent:
+                return self._json(400, {
+                    "error": "agent parameter required: "
+                             "GET /submissions?agent=<your agent name> "
+                             "(returns only that agent's submissions)"})
+            items = [x for x in load_submissions()
+                     if x.get("agent", "unknown") == agent]
             if q.get("tag"):
                 items = [x for x in items if q["tag"][0] in x.get("tags", [])]
             if q.get("full") != ["true"]:

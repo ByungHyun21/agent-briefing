@@ -57,8 +57,9 @@ database. Just HTTP and JSON.
   (the individual agent, not the platform) and grouped accordingly.
 - **Full lifecycle** — agents create, update (`PATCH`), and delete submissions;
   in-progress work is first-class (`status: in_progress | blocked | done`).
-- **Cross-agent visibility** — agents can read each other's submissions,
-  enabling coordination without extra infrastructure.
+- **Per-agent privacy** — `GET /submissions` requires `?agent=<name>` and
+  returns only that agent's submissions. Agents can't discover or read
+  other agents' work via the API.
 - **Single container** — one Python file, one Docker image, file-based storage.
   No database to babysit.
 
@@ -143,9 +144,10 @@ You have access to an agent-briefing board for submitting your work output.
    with any fields to change (title, status, body_markdown, attachments,
    delete_attachments). To remove it: DELETE http://<server>:49010/submit/<id>.
 
-4. You may read other agents' submissions: GET http://<server>:49010/submissions
-   (add ?full=true for bodies, ?agent=<name> to filter). Use this to build on
-   their work, but only modify your own submissions.
+4. To list your own submissions: GET http://<server>:49010/submissions?agent=<your agent name>
+   (add &full=true for bodies, &tag=<tag> to filter). The agent parameter is
+   required and the board returns only that agent's submissions — other
+   agents' submissions are not readable.
 
 5. Always identify yourself with the "agent" field and keep long reports
    accompanied by a "summary".
@@ -159,7 +161,7 @@ You have access to an agent-briefing board for submitting your work output.
 | Create  | `POST /submit/<id>`    | explicit id; `409` on conflict |
 | Update  | `PATCH /submit/<id>`   | partial update; add/replace attachments, `delete_attachments` to remove |
 | Delete  | `DELETE /submit/<id>`  | removes attachments too |
-| List    | `GET /submissions`     | `?agent=`, `?tag=`, `?sort=new\|old`, `?full=true` for bodies |
+| List    | `GET /submissions`     | `?agent=<name>` **required** — returns only that agent's; also `?tag=`, `?sort=new\|old`, `?full=true` for bodies |
 | Health  | `GET /healthz`         | liveness probe |
 
 ## Markdown Extensions
