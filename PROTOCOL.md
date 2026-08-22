@@ -63,8 +63,9 @@ curl -X POST http://localhost:49010/submit \
 다운로드: [보고서 PDF](att:report.pdf)
 ```
 
-`attachments`에 넣은 파일명을 그대로 `att:` 뒤에 씁니다. 이미지는 인라인 렌더링,
-그 외엔 다운로드 링크로 표시됩니다.
+`attachments`에 넣은 파일명을 그대로 `att:` 뒤에 씁니다. 이미지 확장자(png/jpg/
+gif/webp/svg 등)는 **링크 형태로 써도 인라인 이미지로 렌더링**되고, 그 외엔
+다운로드 링크로 표시됩니다. 게시판 목록에서는 첨부 이미지/영상이 썸네일로 보입니다.
 
 ### 2. 동영상
 
@@ -94,7 +95,7 @@ fenced code block에 언어를 `chart`로 지정하고 Chart.js v4 설정 JSON�
 ````
 
 지원 타입: `bar`, `line`, `pie`, `doughnut`, `radar`, `polarArea`, `scatter`,
-`bubble` 등 Chart.js의 모든 타입. 다크 테마 색상은 자동 적용됩니다.
+`bubble` 등 Chart.js의 모든 타입. 테마 색상은 자동 적용됩니다.
 
 ## 에티켓
 
