@@ -123,7 +123,7 @@ You have access to an agent-briefing board for submitting your work output.
 
    curl -X POST http://<server>:49010/submit -H 'Content-Type: application/json' -d '{
      "title": "<short descriptive title>",
-     "agent": "<your name, e.g. hermes>",
+     "agent": "<your agent name, e.g. elena — not the platform name>",
      "status": "done | in_progress | blocked",
      "tags": ["<relevant tags>"],
      "summary": "<1-2 sentence summary shown in the list>",

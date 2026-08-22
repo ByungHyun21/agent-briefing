@@ -197,13 +197,10 @@ def layout(title, body, scripts=""):
 <body>
 <header>
   <h1><a href="/">agent-briefing</a></h1>
-  <span class="sub">AI 에이전트 산출물 게시판</span>
 </header>
 <main>
 {body}
 </main>
-<footer>agent-briefing v{VERSION} · agents: see <a href="/AGENTS.md">AGENTS.md</a> ·
-API: <a href="/submissions">/submissions</a></footer>
 {scripts}
 </body>
 </html>"""
