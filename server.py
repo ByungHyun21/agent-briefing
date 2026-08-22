@@ -285,47 +285,45 @@ def layout(title, body, scripts="", nav=""):
   .navlink:hover {{ color:var(--fg); background:var(--panel); }}
   .navlink.sel {{ background:var(--panel); color:var(--fg); font-weight:500; }}
 
-  main {{ flex:1 1 auto; min-width:0; max-width:760px; margin:0 auto;
-          padding:28px 24px 80px; }}
+  main {{ flex:1 1 auto; min-width:0; padding:24px 28px 80px; }}
 
   .toolbar {{ display:flex; flex-wrap:wrap; gap:6px; align-items:center;
-              margin-bottom:24px; }}
+              margin-bottom:16px; }}
   .toolbar .sep {{ width:1px; height:14px; background:var(--line); margin:0 4px; }}
 
-  /* board table */
+  /* board table — single grid so header and rows always align */
   .board {{ border:1px solid var(--line); border-radius:10px; overflow:hidden; }}
-  .bhead, .brows tr {{ display:grid;
-      grid-template-columns:64px 22px minmax(0,1fr) 90px 40px 92px;
-      align-items:center; }}
+  .brow {{ display:grid;
+      grid-template-columns:56px 24px minmax(0,1fr) minmax(80px,140px) 48px 96px;
+      align-items:center; gap:0 8px; padding:8px 14px; }}
   .bhead {{ background:var(--panel); border-bottom:1px solid var(--line);
             font-size:11px; font-weight:600; color:var(--dimmer);
-            text-transform:uppercase; letter-spacing:.05em;
-            padding:8px 12px; }}
-  .brows {{ display:block; }}
-  .brows table {{ width:100%; border-collapse:collapse; }}
-  .brows tr {{ border-bottom:1px solid var(--line); padding:8px 12px;
-               transition:background .08s ease; }}
-  .brows tr:last-child {{ border-bottom:0; }}
-  .brows tr:hover {{ background:var(--panel); }}
-  .thumb {{ width:48px; height:36px; object-fit:cover; border-radius:5px;
+            text-transform:uppercase; letter-spacing:.05em; }}
+  .brows .brow {{ border-bottom:1px solid var(--line); transition:background .08s ease; }}
+  .brows .brow:last-child {{ border-bottom:0; }}
+  .brows .brow:hover {{ background:var(--panel); }}
+  .c-ico, .c-st, .c-title, .c-agent, .c-cnt, .c-date {{ min-width:0; }}
+  .thumb {{ width:44px; height:33px; object-fit:cover; border-radius:5px;
             border:1px solid var(--line); display:block; background:var(--panel); }}
   .thumb.none {{ visibility:hidden; }}
-  .dot {{ display:inline-block; width:7px; height:7px; border-radius:50%; }}
+  .dot {{ display:inline-block; width:7px; height:7px; border-radius:50%;
+          vertical-align:middle; }}
   .dot.done {{ background:var(--green); }}
   .dot.in_progress {{ background:var(--amber); }}
   .dot.blocked {{ background:var(--red); }}
-  .t-title a {{ font-size:13.5px; font-weight:500; color:var(--fg); }}
-  .t-title a:hover {{ color:var(--accent); }}
-  .t-title .tag {{ margin-left:6px; }}
+  .c-title {{ font-size:13.5px; white-space:nowrap; overflow:hidden;
+              text-overflow:ellipsis; }}
+  .c-title a {{ font-weight:500; color:var(--fg); }}
+  .c-title a:hover {{ color:var(--accent); }}
+  .c-title .tag {{ margin-left:6px; }}
   .att {{ font-size:11px; color:var(--dimmer); margin-left:6px; }}
   .newc {{ color:var(--accent); font-size:10px; margin-left:4px; }}
-  .t-agent {{ font-size:12.5px; color:var(--dim); }}
-  .t-cnt {{ font-size:12.5px; color:var(--dim); text-align:center; }}
-  .t-date {{ font-size:12px; color:var(--dim); text-align:right;
-             line-height:1.35; }}
-  .t-time {{ display:block; color:var(--dimmer); font-size:11px; }}
-  .h-cnt, .h-date {{ text-align:center; }}
-  .h-date {{ text-align:right; padding-right:4px; }}
+  .c-agent, .h-agent {{ font-size:12.5px; color:var(--dim);
+        white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }}
+  .c-cnt, .h-cnt {{ font-size:12.5px; color:var(--dim); text-align:center; }}
+  .c-date, .h-date {{ font-size:12px; color:var(--dim); text-align:right;
+             line-height:1.35; white-space:nowrap; }}
+  .c-date .t-time {{ display:block; color:var(--dimmer); font-size:11px; }}
   .pill {{ padding:3px 10px; border-radius:6px; font-size:12px; font-weight:500;
            color:var(--dim); background:var(--panel); border:1px solid var(--line);
            transition:all .1s ease; }}
@@ -338,9 +336,8 @@ def layout(title, body, scripts="", nav=""):
   .gcount {{ color:var(--dimmer); font-weight:400; letter-spacing:0;
              text-transform:none; }}
 
-  .card {{ background:#fff; border:1px solid var(--line); border-radius:8px;
-           padding:13px 16px; margin-bottom:8px; display:block;
-           transition:border-color .1s ease, box-shadow .1s ease; }}
+  .viewwrap {{ max-width:920px; }}
+  .card {{ background:#fff; border:1px solid var(--line); border-radius:10px; }}
   a.card:hover {{ border-color:#c9c9c9;
                   box-shadow:0 1px 3px rgba(0,0,0,.06); }}
   .card h2 {{ margin:0 0 5px; font-size:14px; font-weight:600; letter-spacing:-.01em; }}
@@ -524,26 +521,25 @@ def render_index(agent_filter=None, group="agent", sort="new"):
         n_comments = len(comments.get(it["id"], []))
         n_att = len(it.get("attachments", []))
         att_info = f'<span class="att">📎{n_att}</span>' if n_att else ""
-        title_extra = unread = ('<span class="newc">●</span>' if n_comments else "")
+        unread = '<span class="newc">●</span>' if n_comments else ""
         return f"""
-      <tr>
-        <td class="t-ico">{thumb(it)}</td>
-        <td class="t-st"><span class="dot {html.escape(str(st))}" title="{html.escape(str(st))}"></span></td>
-        <td class="t-title"><a href="/view/{it['id']}">{html.escape(it.get('title', '(untitled)'))}</a>
-          {unread}{att_info}{tags}</td>
-        <td class="t-agent">{html.escape(it.get('agent', 'unknown'))}</td>
-        <td class="t-cnt">{n_comments if n_comments else ''}</td>
-        <td class="t-date">{time.strftime('%Y-%m-%d', time.localtime(it.get('ts', 0)))}
-          <span class="t-time">{time.strftime('%H:%M', time.localtime(it.get('ts', 0)))}</span></td>
-      </tr>"""
+      <div class="brow">
+        <div class="c-ico">{thumb(it)}</div>
+        <div class="c-st"><span class="dot {html.escape(str(st))}" title="{html.escape(str(st))}"></span></div>
+        <div class="c-title"><a href="/view/{it['id']}">{html.escape(it.get('title', '(untitled)'))}</a>{unread}{att_info}{tags}</div>
+        <div class="c-agent">{html.escape(it.get('agent', 'unknown'))}</div>
+        <div class="c-cnt">{n_comments if n_comments else ''}</div>
+        <div class="c-date">{time.strftime('%Y-%m-%d', time.localtime(it.get('ts', 0)))}
+          <span class="t-time">{time.strftime('%H:%M', time.localtime(it.get('ts', 0)))}</span></div>
+      </div>"""
 
     header = """
-      <div class="bhead">
-        <span class="h-ico"></span><span class="h-st"></span>
-        <span class="h-title">Title</span>
-        <span class="h-agent">Agent</span>
-        <span class="h-cnt">Cmt</span>
-        <span class="h-date">Date</span>
+      <div class="brow bhead">
+        <div class="c-ico"></div><div class="c-st"></div>
+        <div class="c-title">Title</div>
+        <div class="h-agent">Agent</div>
+        <div class="h-cnt">Cmt</div>
+        <div class="h-date">Date</div>
       </div>"""
     rows = "".join(row(it) for it in items)
     board = f'<div class="board">{header}<div class="brows">{rows}</div></div>'
@@ -587,8 +583,9 @@ def render_view(sub_id):
     </form>
   </div>"""
     body = f"""
+  <div class="viewwrap">
   <p style="margin:0 0 12px;font-size:12.5px;"><a href="/" style="color:var(--dim)">&larr; agent-briefing</a></p>
-  <div class="card" style="padding:20px 24px;">
+  <div class="card" style="padding:22px 28px;">
     <h2 style="font-size:18px;letter-spacing:-.02em;">{html.escape(it.get('title', '(untitled)'))}</h2>
     <div class="meta" style="margin-bottom:14px;">
       <span class="st {html.escape(str(st))}"><span class="dot {html.escape(str(st))}"></span>{html.escape(str(st))}</span>
@@ -599,7 +596,8 @@ def render_view(sub_id):
     <div class="content">{content}
     {att_html}</div>
   </div>
-  {comment_html}"""
+  {comment_html}
+  </div>"""
     scripts = CHART_SCRIPT if charts else ""
     return body, 200, scripts
 
