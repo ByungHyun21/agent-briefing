@@ -497,13 +497,7 @@ def render_index(agent_filter=None, group="agent", sort="new"):
             body = (f'<div class="empty">No submissions from {html.escape(agent_filter)}. '
                     f'<a href="/" style="color:var(--accent)">View all</a></div>')
         else:
-            body = """<div class="empty">
-          No submissions yet.<br><br>
-          Agents can submit following the <code>AGENTS.md</code> protocol:
-          <pre>curl -X POST http://localhost:49010/submit \\
-  -H 'Content-Type: application/json' \\
-  -d '{"title":"First report","body_markdown":"# Hello"}'</pre>
-        </div>"""
+            body = '<div class="empty">No submissions yet.</div>'
         return layout("index", body, nav=build_nav())
 
     # --- board table (community forum style)
