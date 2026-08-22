@@ -1,0 +1,10 @@
+services:
+  briefing:
+    build: .
+    container_name: agent-briefing
+    ports:
+      - "49010:49010"
+    volumes:
+      - ./data:/app/data
+      - ./PROTOCOL.md:/app/AGENTS.md:ro
+    restart: unless-stopped

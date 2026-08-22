@@ -1,0 +1,5 @@
+data/
+.git/
+.docker/
+*.pyc
+__pycache__/
