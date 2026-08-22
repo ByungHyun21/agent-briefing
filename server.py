@@ -178,10 +178,14 @@ STATUS_STYLE = {"done": "done", "in_progress": "in progress", "blocked": "blocke
 
 
 def build_nav(current_id=None):
-    """Sidebar: collapsible agent groups, then by-date section."""
+    """Sidebar: collapsible Agents section (agent names filter the board),
+    then a by-date section with collapsible date groups."""
     items = load_submissions()
     items.sort(key=lambda x: x.get("ts", 0), reverse=True)
     comments = load_comments()
+    by_agent = {}
+    for it in items:
+        by_agent.setdefault(it.get("agent", "unknown"), []).append(it)
 
     def unread_dot(it):
         n = len(comments.get(it["id"], []))
@@ -192,21 +196,18 @@ def build_nav(current_id=None):
         return (f'<a href="/view/{s["id"]}"{sel}>'
                 f'{html.escape(s.get("title", "(untitled)"))} {unread_dot(s)}</a>')
 
-    parts = ['<div class="navhead">Agents</div>']
-    by_agent = {}
-    for it in items:
-        by_agent.setdefault(it.get("agent", "unknown"), []).append(it)
-    for a in sorted(by_agent):
-        subs = by_agent[a]
-        links = "".join(link(s) for s in subs)
-        parts.append(
-            f'<div class="navgroup" data-key="agent-{html.escape(a, quote=True)}">'
-            f'<button data-key="agent-{html.escape(a, quote=True)}">'
-            f'<span class="caret">&#9654;</span>{html.escape(a)}'
-            f'<span class="cnt">{len(subs)}</span></button>'
-            f'<div class="items">{links}</div></div>')
+    # Section 1: Agents — whole section collapses; agent names filter board.
+    agent_links = "".join(
+        f'<a class="navlink" href="/?agent={html.escape(a, quote=True)}">'
+        f'{html.escape(a)} <span class="cnt">{len(subs)}</span></a>'
+        for a, subs in sorted(by_agent.items()))
+    parts = [
+        '<div class="navgroup open" data-key="sec-agents">'
+        '<button data-key="sec-agents"><span class="caret">&#9654;</span>Agents</button>'
+        f'<div class="items">{agent_links}</div></div>']
 
-    parts.append('<div class="navhead">By date</div>')
+    # Section 2: Dates — each date collapses to show its posts.
+    parts.append('<div class="navhead">Dates</div>')
     by_day = {}
     for it in items:
         by_day.setdefault(time.strftime("%Y-%m-%d", time.localtime(it.get("ts", 0))), []).append(it)
@@ -290,6 +291,41 @@ def layout(title, body, scripts="", nav=""):
   .toolbar {{ display:flex; flex-wrap:wrap; gap:6px; align-items:center;
               margin-bottom:24px; }}
   .toolbar .sep {{ width:1px; height:14px; background:var(--line); margin:0 4px; }}
+
+  /* board table */
+  .board {{ border:1px solid var(--line); border-radius:10px; overflow:hidden; }}
+  .bhead, .brows tr {{ display:grid;
+      grid-template-columns:64px 22px minmax(0,1fr) 90px 40px 92px;
+      align-items:center; }}
+  .bhead {{ background:var(--panel); border-bottom:1px solid var(--line);
+            font-size:11px; font-weight:600; color:var(--dimmer);
+            text-transform:uppercase; letter-spacing:.05em;
+            padding:8px 12px; }}
+  .brows {{ display:block; }}
+  .brows table {{ width:100%; border-collapse:collapse; }}
+  .brows tr {{ border-bottom:1px solid var(--line); padding:8px 12px;
+               transition:background .08s ease; }}
+  .brows tr:last-child {{ border-bottom:0; }}
+  .brows tr:hover {{ background:var(--panel); }}
+  .thumb {{ width:48px; height:36px; object-fit:cover; border-radius:5px;
+            border:1px solid var(--line); display:block; background:var(--panel); }}
+  .thumb.none {{ visibility:hidden; }}
+  .dot {{ display:inline-block; width:7px; height:7px; border-radius:50%; }}
+  .dot.done {{ background:var(--green); }}
+  .dot.in_progress {{ background:var(--amber); }}
+  .dot.blocked {{ background:var(--red); }}
+  .t-title a {{ font-size:13.5px; font-weight:500; color:var(--fg); }}
+  .t-title a:hover {{ color:var(--accent); }}
+  .t-title .tag {{ margin-left:6px; }}
+  .att {{ font-size:11px; color:var(--dimmer); margin-left:6px; }}
+  .newc {{ color:var(--accent); font-size:10px; margin-left:4px; }}
+  .t-agent {{ font-size:12.5px; color:var(--dim); }}
+  .t-cnt {{ font-size:12.5px; color:var(--dim); text-align:center; }}
+  .t-date {{ font-size:12px; color:var(--dim); text-align:right;
+             line-height:1.35; }}
+  .t-time {{ display:block; color:var(--dimmer); font-size:11px; }}
+  .h-cnt, .h-date {{ text-align:center; }}
+  .h-date {{ text-align:right; padding-right:4px; }}
   .pill {{ padding:3px 10px; border-radius:6px; font-size:12px; font-weight:500;
            color:var(--dim); background:var(--panel); border:1px solid var(--line);
            transition:all .1s ease; }}
@@ -431,34 +467,26 @@ def render_index(agent_filter=None, group="agent", sort="new"):
     items = load_submissions()
     all_agents = sorted({x.get("agent", "unknown") for x in items})
 
-    # --- filter chips (by agent)
-    chips = ""
-    if all_agents:
-        chip_links = [f'<a class="pill{" sel" if not agent_filter else ""}" '
-                      f'href="/?group={group}&sort={sort}">All {len(items)}</a>']
-        for a in all_agents:
-            n = sum(1 for x in items if x.get("agent", "unknown") == a)
-            cls = "pill sel" if agent_filter == a else "pill"
-            chip_links.append(
-                f'<a class="{cls}" '
-                f'href="/?agent={html.escape(a, quote=True)}&group={group}&sort={sort}">'
-                f'{html.escape(a)} {n}</a>')
-        chips = f'<div class="toolbar">{"".join(chip_links)}'
-
-    # --- group/sort controls
+    # --- toolbar: agent filter chips + sort
     def ctl(cur, val, label, key, keep):
         cls = "pill sel" if cur == val else "pill"
         keep_q = "&".join(f"{k}={html.escape(v, quote=True)}" for k, v in keep if v)
         href = f"/?{keep_q}&{key}={val}" if keep_q else f"/?{key}={val}"
         return f'<a class="{cls}" href="{href}">{label}</a>'
 
-    controls = ('<span class="sep"></span>' if chips else '<div class="toolbar">') + \
-        ctl(group, "agent", "by agent", "group", [("agent", agent_filter), ("sort", sort)]) + \
-        ctl(group, "date", "by date", "group", [("agent", agent_filter), ("sort", sort)]) + \
-        '<span class="sep"></span>' + \
-        ctl(sort, "new", "newest", "sort", [("agent", agent_filter), ("group", group)]) + \
-        ctl(sort, "old", "oldest", "sort", [("agent", agent_filter), ("group", group)])
-    controls = chips + controls + '</div>' if chips else controls + '</div>'
+    chips = ""
+    if all_agents:
+        chip_links = [f'<a class="pill{" sel" if not agent_filter else ""}" '
+                      f'href="/?sort={sort}">All {len(items)}</a>']
+        for a in all_agents:
+            cls = "pill sel" if agent_filter == a else "pill"
+            chip_links.append(
+                f'<a class="{cls}" href="/?agent={html.escape(a, quote=True)}&sort={sort}">'
+                f'{html.escape(a)}</a>')
+        chips = f'<div class="toolbar">{"".join(chip_links)}'
+    controls = (chips or '<div class="toolbar">') + '<span class="sep"></span>' + \
+        ctl(sort, "new", "newest", "sort", [("agent", agent_filter)]) + \
+        ctl(sort, "old", "oldest", "sort", [("agent", agent_filter)]) + '</div>'
 
     if agent_filter:
         items = [x for x in items if x.get("agent", "unknown") == agent_filter]
@@ -478,46 +506,54 @@ def render_index(agent_filter=None, group="agent", sort="new"):
         </div>"""
         return layout("index", body, nav=build_nav())
 
-    # --- grouping
-    def card(it):
-        st = it.get("status", "done")
-        tags = " ".join(f'<a class="tag" href="/?tag={html.escape(t, quote=True)}&group={group}&sort={sort}">#{html.escape(t)}</a>'
-                       for t in it.get("tags", []))
-        n_att = len(it.get("attachments", []))
-        att_info = f'<span title="attachments">{n_att}📎</span>' if n_att else ""
-        preview = html.escape((it.get("summary") or it.get("body_markdown", ""))[:200])
-        return f"""
-  <a class="card" href="/view/{it['id']}">
-    <h2>{html.escape(it.get('title', '(untitled)'))}</h2>
-    <div class="meta">
-      <span class="st {html.escape(str(st))}"><span class="dot {html.escape(str(st))}"></span>{html.escape(str(st))}</span>
-      <span>{html.escape(it.get('agent', 'unknown'))}</span>
-      <span>{time.strftime('%Y-%m-%d %H:%M', time.localtime(it.get('ts', 0)))}</span>
-      {att_info}
-      {tags}
-    </div>
-    <div class="preview">{preview}</div>
-  </a>"""
+    # --- board table (community forum style)
+    comments = load_comments()
+    IMG_EXTS = (".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".bmp")
+    VID_EXTS = (".mp4", ".webm", ".mov", ".avi", ".mkv")
 
-    sections = []
-    if group == "date":
-        by_day = {}
-        for it in items:
-            day = time.strftime("%Y-%m-%d (%a)", time.localtime(it.get("ts", 0)))
-            by_day.setdefault(day, []).append(it)
-        for day in sorted(by_day, reverse=(sort != "old")):
-            sections.append(f'<h2 class="ghead">{html.escape(day)} '
-                            f'<span class="gcount">{len(by_day[day])}</span></h2>')
-            sections.extend(card(it) for it in by_day[day])
-    else:  # group by agent
-        by_agent = {}
-        for it in items:
-            by_agent.setdefault(it.get("agent", "unknown"), []).append(it)
-        for a in sorted(by_agent):
-            sections.append(f'<h2 class="ghead">{html.escape(a)} '
-                            f'<span class="gcount">{len(by_agent[a])}</span></h2>')
-            sections.extend(card(it) for it in by_agent[a])
-    return layout("index", chips + controls + "".join(sections), nav=build_nav())
+    def thumb(it):
+        atts = it.get("attachments", [])
+        img = next((a for a in atts if a.lower().endswith(IMG_EXTS)), None)
+        vid = next((a for a in atts if a.lower().endswith(VID_EXTS)), None)
+        if img:
+            return (f'<img class="thumb" loading="lazy" '
+                    f'src="/attachments/{it["id"]}/{html.escape(img)}" alt="">')
+        if vid:
+            return (f'<video class="thumb" preload="metadata" '
+                    f'src="/attachments/{it["id"]}/{html.escape(vid)}"></video>')
+        return '<div class="thumb none"></div>'
+
+    def row(it):
+        st = it.get("status", "done")
+        tags = " ".join(f'<a class="tag" href="/?tag={html.escape(t, quote=True)}">#{html.escape(t)}</a>'
+                        for t in it.get("tags", [])[:4])
+        n_comments = len(comments.get(it["id"], []))
+        n_att = len(it.get("attachments", []))
+        att_info = f'<span class="att">📎{n_att}</span>' if n_att else ""
+        title_extra = unread = ('<span class="newc">●</span>' if n_comments else "")
+        return f"""
+      <tr>
+        <td class="t-ico">{thumb(it)}</td>
+        <td class="t-st"><span class="dot {html.escape(str(st))}" title="{html.escape(str(st))}"></span></td>
+        <td class="t-title"><a href="/view/{it['id']}">{html.escape(it.get('title', '(untitled)'))}</a>
+          {unread}{att_info}{tags}</td>
+        <td class="t-agent">{html.escape(it.get('agent', 'unknown'))}</td>
+        <td class="t-cnt">{n_comments if n_comments else ''}</td>
+        <td class="t-date">{time.strftime('%Y-%m-%d', time.localtime(it.get('ts', 0)))}
+          <span class="t-time">{time.strftime('%H:%M', time.localtime(it.get('ts', 0)))}</span></td>
+      </tr>"""
+
+    header = """
+      <div class="bhead">
+        <span class="h-ico"></span><span class="h-st"></span>
+        <span class="h-title">Title</span>
+        <span class="h-agent">Agent</span>
+        <span class="h-cnt">Cmt</span>
+        <span class="h-date">Date</span>
+      </div>"""
+    rows = "".join(row(it) for it in items)
+    board = f'<div class="board">{header}<div class="brows">{rows}</div></div>'
+    return layout("index", controls + board, nav=build_nav())
 
 
 def render_view(sub_id):
