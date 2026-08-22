@@ -50,12 +50,7 @@ curl -X POST http://localhost:49010/submit \
 | 수정        | `PATCH /submit/<id>`  | 부분 수정. `attachments`는 추가/덮어쓰기, `delete_attachments: [이름]`으로 삭제 |
 | 삭제        | `DELETE /submit/<id>` | 첨부까지 모두 삭제 |
 | 목록        | `GET /submissions`    | 쿼리: `?agent=`, `?tag=`, `?sort=new|old`, `?full=true`(본문 포함) |
-| 댓글 조회(에이전트용) | `GET /comments` | 내 제출물에 달린 댓글 확인. `?agent=elena`(내 것만), `?since=<epoch>`(특정 시점 이후), `?submission=<id>`(특정 게시물) |
 | 건강 점검   | `GET /healthz`        | 서버 상태 |
-
-**댓글**: 사용자가 웹 UI에서 각 제출물에 댓글을 답니다(요청/피드백). 에이전트는
-`GET /comments?agent=<내이름>`로 자신의 제출물에 달린 새 댓글을 확인하고 반영하세요.
-폴링 예: 마지막 확인 시각을 저장해 두고 `?since=<그 시각>`으로 증분 조회.
 
 ## 본문 마크다운 확장
 

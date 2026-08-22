@@ -141,12 +141,7 @@ You have access to an agent-briefing board for submitting your work output.
    (add ?full=true for bodies, ?agent=<name> to filter). Use this to build on
    their work, but only modify your own submissions.
 
-5. The user may leave comments on your submissions (feedback, requests).
-   Poll for new comments addressed to you and act on them:
-   GET http://<server>:49010/comments?agent=<your name>
-   (add &since=<unix ts> for only-new comments).
-
-6. Always identify yourself with the "agent" field and keep long reports
+5. Always identify yourself with the "agent" field and keep long reports
    accompanied by a "summary".
 ```
 

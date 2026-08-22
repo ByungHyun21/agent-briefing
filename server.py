@@ -144,35 +144,6 @@ def extract_charts(html_text):
 CHART_JS_CDN = "https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"
 
 
-# ---------------------------------------------------------------- comments
-def comments_path():
-    return os.path.join(DATA_DIR, "comments.json")
-
-
-def load_comments():
-    try:
-        with open(comments_path(), encoding="utf-8") as f:
-            return json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError):
-        return {}
-
-
-def save_comments(c):
-    tmp = comments_path() + ".tmp"
-    with open(tmp, "w", encoding="utf-8") as f:
-        json.dump(c, f, ensure_ascii=False, indent=1)
-    os.replace(tmp, comments_path())
-
-
-def add_comment(sub_id, author, text):
-    c = load_comments()
-    entry = {"id": uuid.uuid4().hex[:10], "author": author[:60],
-             "text": text[:4000], "ts": time.time()}
-    c.setdefault(sub_id, []).append(entry)
-    save_comments(c)
-    return entry
-
-
 # ---------------------------------------------------------------- views
 STATUS_STYLE = {"done": "done", "in_progress": "in progress", "blocked": "blocked"}
 
@@ -182,19 +153,14 @@ def build_nav(current_id=None):
     then a by-date section with collapsible date groups."""
     items = load_submissions()
     items.sort(key=lambda x: x.get("ts", 0), reverse=True)
-    comments = load_comments()
     by_agent = {}
     for it in items:
         by_agent.setdefault(it.get("agent", "unknown"), []).append(it)
 
-    def unread_dot(it):
-        n = len(comments.get(it["id"], []))
-        return '<span style="color:var(--accent);font-size:10px;">●</span>' if n else ""
-
     def link(s):
         sel = ' class="sel"' if s["id"] == current_id else ""
         return (f'<a href="/view/{s["id"]}"{sel}>'
-                f'{html.escape(s.get("title", "(untitled)"))} {unread_dot(s)}</a>')
+                f'{html.escape(s.get("title", "(untitled)"))}</a>')
 
     # Section 1: Agents — whole section collapses; agent names filter board.
     agent_links = "".join(
@@ -294,7 +260,7 @@ def layout(title, body, scripts="", nav=""):
   /* board table — single grid so header and rows always align */
   .board {{ border:1px solid var(--line); border-radius:10px; overflow:hidden; }}
   .brow {{ display:grid;
-      grid-template-columns:56px 24px minmax(0,1fr) minmax(80px,140px) 48px 96px;
+      grid-template-columns:56px 24px minmax(0,1fr) minmax(80px,140px) 96px;
       align-items:center; gap:0 8px; padding:8px 14px; }}
   .bhead {{ background:var(--panel); border-bottom:1px solid var(--line);
             font-size:11px; font-weight:600; color:var(--dimmer);
@@ -384,19 +350,6 @@ def layout(title, body, scripts="", nav=""):
                 border-radius:6px; padding:14px 18px; font-size:12px; }}
   .empty code {{ background:var(--panel); border:1px solid var(--line); }}
 
-  .comment {{ padding:10px 0; border-top:1px solid var(--line); }}
-  .comment:first-of-type {{ border-top:0; }}
-  .ctext {{ font-size:13px; margin-top:3px; white-space:pre-wrap; }}
-  .cform {{ margin-top:14px; display:flex; flex-direction:column; gap:8px; }}
-  .cform input, .cform textarea {{ font:inherit; font-size:13px; padding:8px 10px;
-      border:1px solid var(--line); border-radius:6px; background:#fff;
-      color:var(--fg); resize:vertical; }}
-  .cform input:focus, .cform textarea:focus {{ outline:none;
-      border-color:var(--accent); }}
-  .cform button {{ align-self:flex-start; font:inherit; font-size:13px;
-      font-weight:500; padding:7px 16px; border-radius:6px; border:1px solid var(--fg);
-      background:var(--fg); color:#fff; cursor:pointer; }}
-  .cform button:hover {{ background:var(--accent); border-color:var(--accent); }}
 </style>
 </head>
 <body>
@@ -498,7 +451,6 @@ def render_index(agent_filter=None, group="agent", sort="new"):
         return layout("index", body, nav=build_nav())
 
     # --- board table (community forum style)
-    comments = load_comments()
     IMG_EXTS = (".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".bmp")
     VID_EXTS = (".mp4", ".webm", ".mov", ".avi", ".mkv")
 
@@ -518,17 +470,14 @@ def render_index(agent_filter=None, group="agent", sort="new"):
         st = it.get("status", "done")
         tags = " ".join(f'<a class="tag" href="/?tag={html.escape(t, quote=True)}">#{html.escape(t)}</a>'
                         for t in it.get("tags", [])[:4])
-        n_comments = len(comments.get(it["id"], []))
         n_att = len(it.get("attachments", []))
         att_info = f'<span class="att">📎{n_att}</span>' if n_att else ""
-        unread = '<span class="newc">●</span>' if n_comments else ""
         return f"""
       <div class="brow">
         <div class="c-ico">{thumb(it)}</div>
         <div class="c-st"><span class="dot {html.escape(str(st))}" title="{html.escape(str(st))}"></span></div>
-        <div class="c-title"><a href="/view/{it['id']}">{html.escape(it.get('title', '(untitled)'))}</a>{unread}{att_info}{tags}</div>
+        <div class="c-title"><a href="/view/{it['id']}">{html.escape(it.get('title', '(untitled)'))}</a>{att_info}{tags}</div>
         <div class="c-agent">{html.escape(it.get('agent', 'unknown'))}</div>
-        <div class="c-cnt">{n_comments if n_comments else ''}</div>
         <div class="c-date">{time.strftime('%Y-%m-%d', time.localtime(it.get('ts', 0)))}
           <span class="t-time">{time.strftime('%H:%M', time.localtime(it.get('ts', 0)))}</span></div>
       </div>"""
@@ -538,7 +487,6 @@ def render_index(agent_filter=None, group="agent", sort="new"):
         <div class="c-ico"></div><div class="c-st"></div>
         <div class="c-title">Title</div>
         <div class="h-agent">Agent</div>
-        <div class="h-cnt">Cmt</div>
         <div class="h-date">Date</div>
       </div>"""
     rows = "".join(row(it) for it in items)
@@ -564,24 +512,6 @@ def render_view(sub_id):
     updated = ""
     if it.get("updated_ts") and it["updated_ts"] != it.get("ts"):
         updated = (f'<span>· edited {time.strftime("%Y-%m-%d %H:%M", time.localtime(it["updated_ts"]))}</span>')
-    comments = load_comments().get(sub_id, [])
-    rows = "".join(f"""
-      <div class="comment">
-        <div class="meta"><b>{html.escape(c_["author"])}</b>
-          <span>{time.strftime("%Y-%m-%d %H:%M", time.localtime(c_["ts"]))}</span></div>
-        <div class="ctext">{html.escape(c_["text"]).replace(chr(10), "<br>")}</div>
-      </div>""" for c_ in comments)
-    n = len(comments)
-    comment_html = f"""
-  <div class="card" style="padding:18px 24px;">
-    <h3 style="margin:0 0 12px;font-size:13.5px;">Comments <span style="color:var(--dimmer);font-weight:400">{n}</span></h3>
-    {rows if rows else '<p style="color:var(--dimmer);font-size:12.5px;margin:0 0 10px;">No comments yet.</p>'}
-    <form method="POST" action="/comment/{sub_id}" class="cform">
-      <input type="text" name="author" placeholder="Name" required maxlength="60">
-      <textarea name="text" placeholder="Write a comment…" required maxlength="4000"></textarea>
-      <button type="submit">Comment</button>
-    </form>
-  </div>"""
     body = f"""
   <div class="viewwrap">
   <p style="margin:0 0 12px;font-size:12.5px;"><a href="/" style="color:var(--dim)">&larr; agent-briefing</a></p>
@@ -596,7 +526,6 @@ def render_view(sub_id):
     <div class="content">{content}
     {att_html}</div>
   </div>
-  {comment_html}
   </div>"""
     scripts = CHART_SCRIPT if charts else ""
     return body, 200, scripts
@@ -694,38 +623,11 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(404, "AGENTS.md missing", "text/plain")
         if u.path == "/healthz":
             return self._json(200, {"ok": True, "version": VERSION})
-        if u.path in ("/comments", "/api/comments"):
-            # For agents: comments on their own submissions.
-            # ?agent=<name>  -> only comments on that agent's submissions
-            # ?since=<epoch> -> only comments newer than this timestamp
-            # ?submission=<id> -> comments on one submission
-            q = parse_qs(u.query)
-            subs = {x["id"]: x for x in load_submissions()}
-            comments = load_comments()
-            agent = (q.get("agent") or [None])[0]
-            since = float((q.get("since") or ["0"])[0])
-            one = (q.get("submission") or [None])[0]
-            out = []
-            for sid, lst in comments.items():
-                sub = subs.get(sid)
-                if one and sid != one:
-                    continue
-                if agent and (not sub or sub.get("agent", "unknown") != agent):
-                    continue
-                for c_ in lst:
-                    if c_["ts"] > since:
-                        out.append({**c_, "submission_id": sid,
-                                    "submission_title": sub["title"] if sub else "?"})
-            out.sort(key=lambda x: x["ts"])
-            return self._json(200, {"count": len(out), "comments": out})
         return self._send(404, "not found", "text/plain")
 
     # ---- POST /submit
     def do_POST(self):
         u = urlparse(self.path)
-        m = re.fullmatch(r"/comment/([a-zA-Z0-9_-]+)", u.path)
-        if m:
-            return self.handle_comment(m.group(1))
         m = re.fullmatch(r"/submit/([a-zA-Z0-9_-]+)", u.path)
         if m:
             return self.handle_update(m.group(1), create=True)
@@ -770,26 +672,6 @@ class Handler(BaseHTTPRequestHandler):
         if not m:
             return self._json(404, {"error": "PATCH /submit/<id>"})
         return self.handle_update(m.group(1), create=False)
-
-    def handle_comment(self, sub_id):
-        # HTML form post from the view page (user comments)
-        if sub_id not in [x["id"] for x in load_submissions()]:
-            return self._send(404, "no such submission", "text/plain")
-        n = int(self.headers.get("Content-Length") or 0)
-        if n > 100 * 1024:
-            return self._send(413, "too large", "text/plain")
-        from urllib.parse import parse_qs as _pq
-        fields = _pq(self.rfile.read(n).decode("utf-8", "replace"))
-        author = (fields.get("author") or [""])[0].strip()[:60]
-        text = (fields.get("text") or [""])[0].strip()[:4000]
-        if not author or not text:
-            page, code, scripts = render_view(sub_id)
-            return self._send(code, layout(sub_id, page, scripts, nav=build_nav(sub_id)))
-        add_comment(sub_id, author, text)
-        self.send_response(303)
-        self.send_header("Location", f"/view/{sub_id}")
-        self.send_header("Content-Length", "0")
-        self.end_headers()
 
     def handle_update(self, sub_id, create):
         items = load_submissions()
