@@ -133,95 +133,148 @@ def extract_charts(html_text):
 CHART_JS_CDN = "https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"
 
 
+# ---------------------------------------------------------------- comments
+def comments_path():
+    return os.path.join(DATA_DIR, "comments.json")
+
+
+def load_comments():
+    try:
+        with open(comments_path(), encoding="utf-8") as f:
+            return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {}
+
+
+def save_comments(c):
+    tmp = comments_path() + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(c, f, ensure_ascii=False, indent=1)
+    os.replace(tmp, comments_path())
+
+
+def add_comment(sub_id, author, text):
+    c = load_comments()
+    entry = {"id": uuid.uuid4().hex[:10], "author": author[:60],
+             "text": text[:4000], "ts": time.time()}
+    c.setdefault(sub_id, []).append(entry)
+    save_comments(c)
+    return entry
+
+
 # ---------------------------------------------------------------- views
 STATUS_STYLE = {"done": "done", "in_progress": "in progress", "blocked": "blocked"}
 
 
 def layout(title, body, scripts=""):
     return f"""<!doctype html>
-<html lang="ko">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{html.escape(title)} · agent-briefing</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
-  :root {{ --bg:#08090a; --panel:rgba(255,255,255,.024); --panel-hover:rgba(255,255,255,.045);
-          --line:rgba(255,255,255,.07); --fg:#f7f8f8; --dim:#8a8f98; --dimmer:#62666d;
-          --accent:#7170ff; --accent-hover:#828fff; --mono:#101113; }}
+  :root {{ --bg:#fff; --fg:#171717; --dim:#666; --dimmer:#999; --line:#eaeaea;
+          --panel:#fafafa; --accent:#0070f3; --accent-dark:#0058cc;
+          --green:#0e9f6e; --amber:#d97706; --red:#dc2626; }}
   * {{ box-sizing:border-box; }}
-  html {{ font-feature-settings:"cv01","ss03"; }}
   body {{ margin:0; background:var(--bg); color:var(--fg);
-         font:13.5px/1.55 'Inter',-apple-system,"Segoe UI",Roboto,"Noto Sans KR",sans-serif;
+         font:14px/1.6 'Inter',-apple-system,"Segoe UI",Roboto,"Noto Sans KR",sans-serif;
          -webkit-font-smoothing:antialiased; }}
-  a {{ color:var(--fg); text-decoration:none; }}
-  a:hover {{ color:var(--accent-hover); }}
-  header {{ border-bottom:1px solid var(--line); padding:0 24px; height:48px;
+  a {{ color:inherit; text-decoration:none; }}
+
+  header {{ border-bottom:1px solid var(--line); height:52px;
             display:flex; align-items:center; position:sticky; top:0;
-            background:rgba(8,9,10,.85); backdrop-filter:blur(8px); z-index:10;
-            max-width:860px; margin:0 auto; }}
-  header h1 {{ font-size:13px; margin:0; font-weight:590; letter-spacing:-.01em; }}
-  header h1 a {{ color:var(--fg); }}
-  header h1 a:hover {{ color:var(--accent-hover); }}
-  main {{ max-width:860px; margin:0 auto; padding:20px 24px 60px; }}
-  .card {{ background:var(--panel); border:1px solid var(--line);
-           border-radius:8px; padding:12px 16px; margin-bottom:8px;
-           transition:background .12s ease; }}
-  a.card:hover {{ background:var(--panel-hover); border-color:rgba(255,255,255,.11); }}
-  .card h2 {{ margin:0 0 4px; font-size:13.5px; font-weight:510; letter-spacing:-.01em; }}
-  .card .preview {{ margin-top:2px; }}
-  .meta {{ color:var(--dim); font-size:11.5px; display:flex; flex-wrap:wrap;
-           gap:6px 10px; align-items:center; }}
-  .badge {{ padding:0 7px; border-radius:99px; font-size:10.5px; line-height:17px;
-            font-weight:510; border:1px solid var(--line); color:var(--dim);
-            white-space:nowrap; }}
-  a.badge:hover {{ border-color:rgba(255,255,255,.18); color:var(--fg); }}
-  .badge.sel {{ color:var(--fg); border-color:rgba(255,255,255,.2);
-                background:rgba(255,255,255,.06); }}
-  .dot {{ display:inline-block; width:6px; height:6px; border-radius:50%;
-          margin-right:5px; vertical-align:0; }}
-  .dot.done {{ background:#10b981; }}
-  .dot.in_progress {{ background:#f59e0b; }}
-  .dot.blocked {{ background:#ef4444; }}
-  .st.done {{ color:#10b981; }}
-  .st.in_progress {{ color:#f59e0b; }}
-  .st.blocked {{ color:#ef4444; }}
-  .preview {{ color:var(--dim); font-size:12px; overflow:hidden;
-              text-overflow:ellipsis; white-space:nowrap; }}
+            background:rgba(255,255,255,.9); backdrop-filter:blur(6px); z-index:10; }}
+  header .wrap {{ max-width:720px; margin:0 auto; padding:0 24px; width:100%; }}
+  header h1 {{ font-size:14px; margin:0; font-weight:600; letter-spacing:-.01em; }}
+  header h1 a:hover {{ color:var(--accent); }}
+
+  main {{ max-width:720px; margin:0 auto; padding:28px 24px 80px; }}
+
   .toolbar {{ display:flex; flex-wrap:wrap; gap:6px; align-items:center;
-              margin-bottom:16px; }}
+              margin-bottom:24px; }}
   .toolbar .sep {{ width:1px; height:14px; background:var(--line); margin:0 4px; }}
-  .ghead {{ font-size:11px; color:var(--dimmer); font-weight:590; margin:18px 0 6px;
-            letter-spacing:.05em; text-transform:uppercase; }}
+  .pill {{ padding:3px 10px; border-radius:6px; font-size:12px; font-weight:500;
+           color:var(--dim); background:var(--panel); border:1px solid var(--line);
+           transition:all .1s ease; }}
+  .pill:hover {{ border-color:#ccc; color:var(--fg); }}
+  .pill.sel {{ background:var(--fg); color:#fff; border-color:var(--fg); }}
+
+  .ghead {{ font-size:11px; color:var(--dimmer); font-weight:600; margin:22px 0 8px;
+            letter-spacing:.06em; text-transform:uppercase; }}
   .ghead:first-child {{ margin-top:0; }}
   .gcount {{ color:var(--dimmer); font-weight:400; letter-spacing:0;
              text-transform:none; }}
-  .content {{ line-height:1.7; font-size:13.5px; }}
-  .content h1 {{ font-size:19px; letter-spacing:-.02em; margin:24px 0 8px; }}
-  .content h2 {{ font-size:15.5px; letter-spacing:-.01em; margin:20px 0 6px; }}
-  .content h3 {{ font-size:14px; margin:16px 0 4px; }}
-  .content pre {{ background:#0b0c0e; border:1px solid var(--line);
-      border-radius:6px; padding:12px; overflow-x:auto; font-size:12px; }}
-  .content code {{ background:#0b0c0e; border-radius:4px; padding:1px 5px;
-      font-size:12px; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; }}
+
+  .card {{ background:#fff; border:1px solid var(--line); border-radius:8px;
+           padding:13px 16px; margin-bottom:8px; display:block;
+           transition:border-color .1s ease, box-shadow .1s ease; }}
+  a.card:hover {{ border-color:#c9c9c9;
+                  box-shadow:0 1px 3px rgba(0,0,0,.06); }}
+  .card h2 {{ margin:0 0 5px; font-size:14px; font-weight:600; letter-spacing:-.01em; }}
+  .meta {{ color:var(--dim); font-size:12px; display:flex; flex-wrap:wrap;
+           gap:4px 10px; align-items:center; }}
+  .dot {{ display:inline-block; width:6px; height:6px; border-radius:50%;
+          margin-right:5px; }}
+  .dot.done {{ background:var(--green); }}
+  .dot.in_progress {{ background:var(--amber); }}
+  .dot.blocked {{ background:var(--red); }}
+  .st.done {{ color:var(--green); }}
+  .st.in_progress {{ color:var(--amber); }}
+  .st.blocked {{ color:var(--red); }}
+  .preview {{ color:var(--dim); font-size:12.5px; margin-top:4px; overflow:hidden;
+              text-overflow:ellipsis; white-space:nowrap; }}
+  .tag {{ font-size:11.5px; color:var(--accent); }}
+  .tag:hover {{ color:var(--accent-dark); }}
+
+  .content {{ line-height:1.7; font-size:14px; }}
+  .content h1 {{ font-size:20px; letter-spacing:-.02em; margin:26px 0 8px;
+                 font-weight:600; }}
+  .content h2 {{ font-size:16px; letter-spacing:-.01em; margin:22px 0 6px;
+                 font-weight:600; }}
+  .content h3 {{ font-size:14px; margin:16px 0 4px; font-weight:600; }}
+  .content pre {{ background:#0d0d0d; color:#eaeaea; border-radius:6px;
+      padding:13px; overflow-x:auto; font-size:12.5px; }}
+  .content code {{ background:var(--panel); border-radius:4px; padding:1px 5px;
+      font-size:12.5px; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; }}
   .content pre code {{ padding:0; background:none; }}
-  .content table {{ border-collapse:collapse; width:100%; font-size:12.5px; }}
-  .content th,.content td {{ border:1px solid var(--line); padding:5px 9px;
+  .content table {{ border-collapse:collapse; width:100%; font-size:13px; }}
+  .content th,.content td {{ border:1px solid var(--line); padding:6px 10px;
       text-align:left; }}
-  .content th {{ background:rgba(255,255,255,.03); font-weight:510; }}
+  .content th {{ background:var(--panel); font-weight:500; }}
   .content blockquote {{ border-left:2px solid var(--line); margin:10px 0;
       padding:2px 14px; color:var(--dim); }}
   .content img {{ max-width:100%; border-radius:6px; border:1px solid var(--line); }}
   .content hr {{ border:0; border-top:1px solid var(--line); margin:20px 0; }}
-  .empty {{ color:var(--dim); text-align:center; padding:60px 0; font-size:13px; }}
-  .empty code {{ background:var(--panel); border:1px solid var(--line);
-                 border-radius:4px; padding:1px 5px; font-size:11.5px; }}
-  .video-wrap {{ margin:14px 0; }}
+  .content a {{ color:var(--accent); }}
+  .content a:hover {{ color:var(--accent-dark); }}
+
+  .empty {{ color:var(--dim); text-align:center; padding:70px 0; font-size:13.5px; }}
+  .empty pre {{ text-align:left; display:inline-block; margin-top:16px;
+                background:var(--panel); border:1px solid var(--line);
+                border-radius:6px; padding:14px 18px; font-size:12px; }}
+  .empty code {{ background:var(--panel); border:1px solid var(--line); }}
+
+  .comment {{ padding:10px 0; border-top:1px solid var(--line); }}
+  .comment:first-of-type {{ border-top:0; }}
+  .ctext {{ font-size:13px; margin-top:3px; white-space:pre-wrap; }}
+  .cform {{ margin-top:14px; display:flex; flex-direction:column; gap:8px; }}
+  .cform input, .cform textarea {{ font:inherit; font-size:13px; padding:8px 10px;
+      border:1px solid var(--line); border-radius:6px; background:#fff;
+      color:var(--fg); resize:vertical; }}
+  .cform input:focus, .cform textarea:focus {{ outline:none;
+      border-color:var(--accent); }}
+  .cform button {{ align-self:flex-start; font:inherit; font-size:13px;
+      font-weight:500; padding:7px 16px; border-radius:6px; border:1px solid var(--fg);
+      background:var(--fg); color:#fff; cursor:pointer; }}
+  .cform button:hover {{ background:var(--accent); border-color:var(--accent); }}
 </style>
 </head>
 <body>
-<header>
-  <h1><a href="/">agent-briefing</a></h1>
-</header>
+<header><div class="wrap"><h1><a href="/">agent-briefing</a></h1></div></header>
 <main>
 {body}
 </main>
@@ -257,11 +310,11 @@ def render_index(agent_filter=None, group="agent", sort="new"):
     # --- filter chips (by agent)
     chips = ""
     if all_agents:
-        chip_links = [f'<a class="badge{" sel" if not agent_filter else ""}" '
-                      f'href="/?group={group}&sort={sort}">all {len(items)}</a>']
+        chip_links = [f'<a class="pill{" sel" if not agent_filter else ""}" '
+                      f'href="/?group={group}&sort={sort}">All {len(items)}</a>']
         for a in all_agents:
             n = sum(1 for x in items if x.get("agent", "unknown") == a)
-            cls = "badge sel" if agent_filter == a else "badge"
+            cls = "pill sel" if agent_filter == a else "pill"
             chip_links.append(
                 f'<a class="{cls}" '
                 f'href="/?agent={html.escape(a, quote=True)}&group={group}&sort={sort}">'
@@ -270,7 +323,7 @@ def render_index(agent_filter=None, group="agent", sort="new"):
 
     # --- group/sort controls
     def ctl(cur, val, label, key, keep):
-        cls = "badge sel" if cur == val else "badge"
+        cls = "pill sel" if cur == val else "pill"
         keep_q = "&".join(f"{k}={html.escape(v, quote=True)}" for k, v in keep if v)
         href = f"/?{keep_q}&{key}={val}" if keep_q else f"/?{key}={val}"
         return f'<a class="{cls}" href="{href}">{label}</a>'
@@ -289,22 +342,22 @@ def render_index(agent_filter=None, group="agent", sort="new"):
 
     if not items:
         if agent_filter:
-            body = ('<div class="empty">해당 에이전트의 제출물이 없습니다. '
-                    '<a href="/">전체 보기</a></div>')
+            body = (f'<div class="empty">No submissions from {html.escape(agent_filter)}. '
+                    f'<a href="/" style="color:var(--accent)">View all</a></div>')
         else:
             body = """<div class="empty">
-          아직 제출된 보고가 없습니다.<br><br>
-          에이전트는 <code>AGENTS.md</code> 프로토콜에 따라 제출할 수 있습니다:
-          <pre style="text-align:left;display:inline-block;margin-top:18px;">curl -X POST http://localhost:49010/submit \\
+          No submissions yet.<br><br>
+          Agents can submit following the <code>AGENTS.md</code> protocol:
+          <pre>curl -X POST http://localhost:49010/submit \\
   -H 'Content-Type: application/json' \\
-  -d '{"title":"첫 보고","body_markdown":"# 안녕하세요"}'</pre>
+  -d '{"title":"First report","body_markdown":"# Hello"}'</pre>
         </div>"""
         return layout("index", body)
 
     # --- grouping
     def card(it):
         st = it.get("status", "done")
-        tags = "".join(f'<a class="badge" href="/?tag={html.escape(t, quote=True)}&group={group}&sort={sort}">#{html.escape(t)}</a>'
+        tags = " ".join(f'<a class="tag" href="/?tag={html.escape(t, quote=True)}&group={group}&sort={sort}">#{html.escape(t)}</a>'
                        for t in it.get("tags", []))
         n_att = len(it.get("attachments", []))
         att_info = f'<span title="attachments">{n_att}📎</span>' if n_att else ""
@@ -330,7 +383,7 @@ def render_index(agent_filter=None, group="agent", sort="new"):
             by_day.setdefault(day, []).append(it)
         for day in sorted(by_day, reverse=(sort != "old")):
             sections.append(f'<h2 class="ghead">{html.escape(day)} '
-                            f'<span class="gcount">{len(by_day[day])}건</span></h2>')
+                            f'<span class="gcount">{len(by_day[day])}</span></h2>')
             sections.extend(card(it) for it in by_day[day])
     else:  # group by agent
         by_agent = {}
@@ -338,7 +391,7 @@ def render_index(agent_filter=None, group="agent", sort="new"):
             by_agent.setdefault(it.get("agent", "unknown"), []).append(it)
         for a in sorted(by_agent):
             sections.append(f'<h2 class="ghead">{html.escape(a)} '
-                            f'<span class="gcount">{len(by_agent[a])}건</span></h2>')
+                            f'<span class="gcount">{len(by_agent[a])}</span></h2>')
             sections.extend(card(it) for it in by_agent[a])
     return layout("index", chips + controls + "".join(sections))
 
@@ -347,7 +400,8 @@ def render_view(sub_id):
     items = load_submissions()
     it = next((x for x in items if x["id"] == sub_id), None)
     if not it:
-        return ('<div class="empty">없는 제출물입니다. <a href="/">목록으로</a></div>', 404, "")
+        return ('<div class="empty">Submission not found. '
+                '<a href="/">Back to list</a></div>', 404, "")
     st = it.get("status", "done")
     content, charts = extract_charts(md_to_html(sub_id, it.get("body_markdown", "")))
     atts = it.get("attachments", [])
@@ -360,8 +414,26 @@ def render_view(sub_id):
     updated = ""
     if it.get("updated_ts") and it["updated_ts"] != it.get("ts"):
         updated = (f'<span>· edited {time.strftime("%Y-%m-%d %H:%M", time.localtime(it["updated_ts"]))}</span>')
+    comments = load_comments().get(sub_id, [])
+    rows = "".join(f"""
+      <div class="comment">
+        <div class="meta"><b>{html.escape(c_["author"])}</b>
+          <span>{time.strftime("%Y-%m-%d %H:%M", time.localtime(c_["ts"]))}</span></div>
+        <div class="ctext">{html.escape(c_["text"]).replace(chr(10), "<br>")}</div>
+      </div>""" for c_ in comments)
+    n = len(comments)
+    comment_html = f"""
+  <div class="card" style="padding:18px 24px;">
+    <h3 style="margin:0 0 12px;font-size:13.5px;">Comments <span style="color:var(--dimmer);font-weight:400">{n}</span></h3>
+    {rows if rows else '<p style="color:var(--dimmer);font-size:12.5px;margin:0 0 10px;">No comments yet.</p>'}
+    <form method="POST" action="/comment/{sub_id}" class="cform">
+      <input type="text" name="author" placeholder="Name" required maxlength="60">
+      <textarea name="text" placeholder="Write a comment…" required maxlength="4000"></textarea>
+      <button type="submit">Comment</button>
+    </form>
+  </div>"""
     body = f"""
-  <p style="margin:0 0 12px;font-size:12px;"><a href="/">&larr; agent-briefing</a></p>
+  <p style="margin:0 0 12px;font-size:12.5px;"><a href="/" style="color:var(--dim)">&larr; agent-briefing</a></p>
   <div class="card" style="padding:20px 24px;">
     <h2 style="font-size:18px;letter-spacing:-.02em;">{html.escape(it.get('title', '(untitled)'))}</h2>
     <div class="meta" style="margin-bottom:14px;">
@@ -372,7 +444,8 @@ def render_view(sub_id):
     </div>
     <div class="content">{content}
     {att_html}</div>
-  </div>"""
+  </div>
+  {comment_html}"""
     scripts = CHART_SCRIPT if charts else ""
     return body, 200, scripts
 
@@ -469,11 +542,38 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(404, "AGENTS.md missing", "text/plain")
         if u.path == "/healthz":
             return self._json(200, {"ok": True, "version": VERSION})
+        if u.path in ("/comments", "/api/comments"):
+            # For agents: comments on their own submissions.
+            # ?agent=<name>  -> only comments on that agent's submissions
+            # ?since=<epoch> -> only comments newer than this timestamp
+            # ?submission=<id> -> comments on one submission
+            q = parse_qs(u.query)
+            subs = {x["id"]: x for x in load_submissions()}
+            comments = load_comments()
+            agent = (q.get("agent") or [None])[0]
+            since = float((q.get("since") or ["0"])[0])
+            one = (q.get("submission") or [None])[0]
+            out = []
+            for sid, lst in comments.items():
+                sub = subs.get(sid)
+                if one and sid != one:
+                    continue
+                if agent and (not sub or sub.get("agent", "unknown") != agent):
+                    continue
+                for c_ in lst:
+                    if c_["ts"] > since:
+                        out.append({**c_, "submission_id": sid,
+                                    "submission_title": sub["title"] if sub else "?"})
+            out.sort(key=lambda x: x["ts"])
+            return self._json(200, {"count": len(out), "comments": out})
         return self._send(404, "not found", "text/plain")
 
     # ---- POST /submit
     def do_POST(self):
         u = urlparse(self.path)
+        m = re.fullmatch(r"/comment/([a-zA-Z0-9_-]+)", u.path)
+        if m:
+            return self.handle_comment(m.group(1))
         m = re.fullmatch(r"/submit/([a-zA-Z0-9_-]+)", u.path)
         if m:
             return self.handle_update(m.group(1), create=True)
@@ -518,6 +618,26 @@ class Handler(BaseHTTPRequestHandler):
         if not m:
             return self._json(404, {"error": "PATCH /submit/<id>"})
         return self.handle_update(m.group(1), create=False)
+
+    def handle_comment(self, sub_id):
+        # HTML form post from the view page (user comments)
+        if sub_id not in [x["id"] for x in load_submissions()]:
+            return self._send(404, "no such submission", "text/plain")
+        n = int(self.headers.get("Content-Length") or 0)
+        if n > 100 * 1024:
+            return self._send(413, "too large", "text/plain")
+        from urllib.parse import parse_qs as _pq
+        fields = _pq(self.rfile.read(n).decode("utf-8", "replace"))
+        author = (fields.get("author") or [""])[0].strip()[:60]
+        text = (fields.get("text") or [""])[0].strip()[:4000]
+        if not author or not text:
+            page, code, scripts = render_view(sub_id)
+            return self._send(code, layout(sub_id, page, scripts))
+        add_comment(sub_id, author, text)
+        self.send_response(303)
+        self.send_header("Location", f"/view/{sub_id}")
+        self.send_header("Content-Length", "0")
+        self.end_headers()
 
     def handle_update(self, sub_id, create):
         items = load_submissions()
